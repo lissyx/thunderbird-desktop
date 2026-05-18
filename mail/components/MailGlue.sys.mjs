@@ -143,20 +143,6 @@ const JSWINDOWACTORS = {
     safeForUntrustedWebProcess: true,
   },
 
-  ContextMenu: {
-    parent: {
-      esModuleURI: "resource:///actors/ContextMenuParent.sys.mjs",
-    },
-    child: {
-      esModuleURI: "resource:///actors/ContextMenuChild.sys.mjs",
-      events: {
-        contextmenu: { mozSystemGroup: true },
-      },
-    },
-    allFrames: true,
-    safeForUntrustedWebProcess: true,
-  },
-
   // As in ActorManagerParent.sys.mjs, but with single-site and single-page
   // message manager groups added.
   FindBar: {
@@ -370,6 +356,28 @@ const JSWINDOWACTORS = {
   },
 };
 
+if (
+  !AppConstants.MOZ_ENTERPRISE ||
+  // Services.felt is valid only on enterprise-firefox branches until it lands
+  // on mozilla-central. Disable the lint rule to avoid noise.
+  // eslint-disable-next-line mozilla/valid-services
+  (AppConstants.MOZ_ENTERPRISE && !Services.felt?.isFeltUI())
+) {
+  JSWINDOWACTORS.ContextMenu = {
+    parent: {
+      esModuleURI: "resource:///actors/ContextMenuParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource:///actors/ContextMenuChild.sys.mjs",
+      events: {
+        contextmenu: { mozSystemGroup: true },
+      },
+    },
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  };
+}
+
 // Seconds of idle time before the late idle tasks will be scheduled.
 const LATE_TASKS_IDLE_TIME_SEC = 20;
 
@@ -544,6 +552,12 @@ MailGlue.prototype = {
           // using it for the first time at shut-down, but that would be very
           // difficult to avoid.
           lazy.windowsAlertsService.removeAllNotificationsForInstall();
+        }
+        if (AppConstants.MOZ_ENTERPRISE) {
+          const { EnterpriseHandler } = ChromeUtils.importESModule(
+            "resource://gre/modules/enterprise/EnterpriseHandler.sys.mjs"
+          );
+          EnterpriseHandler.uninit();
         }
         break;
       case "mail-startup-done":
@@ -724,6 +738,13 @@ MailGlue.prototype = {
     if (AppConstants.MOZ_UPDATER) {
       listeners.init();
     }
+
+    if (AppConstants.MOZ_ENTERPRISE) {
+      const { EnterpriseEndpoints } = ChromeUtils.importESModule(
+        "resource://gre/modules/enterprise/EnterpriseEndpoints.sys.mjs"
+      );
+      EnterpriseEndpoints.init();
+    }
   },
 
   _checkForOldBuildUpdates() {
@@ -844,6 +865,13 @@ MailGlue.prototype = {
         "resource://gre/modules/AsanReporter.sys.mjs"
       );
       AsanReporter.init();
+    }
+
+    if (AppConstants.MOZ_ENTERPRISE) {
+      const { EnterpriseHandler } = ChromeUtils.importESModule(
+        "resource://gre/modules/enterprise/EnterpriseHandler.sys.mjs"
+      );
+      EnterpriseHandler.init();
     }
   },
 
