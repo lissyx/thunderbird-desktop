@@ -11,6 +11,8 @@ from gecko_taskgraph.target_tasks import (
     filter_out_shipping_phase,
     register_target_task,
     standard_filter,
+    target_tasks_enterprise_firefox,
+    target_tasks_enterprise_firefox_with_tests,
 )
 
 from comm_taskgraph.try_option_syntax import _try_cc_option_syntax
@@ -83,3 +85,32 @@ def target_tasks_tb_rust_vendor_check(full_task_graph, parameters, graph_config)
         return task.kind in ["repo-update"]
 
     return [l for l, t in full_task_graph.tasks.items() if _filter(t)]
+
+@register_target_task("enterprise_thunderbird_tasks")
+def target_tasks_enterprise_thunderbird(full_task_graph, parameters, graph_config):
+    def filter(task):
+        if task.attributes.get("shippable", False):
+            return False
+
+        if task.kind not in ["build", "test"]:
+            return False
+
+        return True
+
+    return [l for l in target_tasks_enterprise_firefox(full_task_graph, parameters, graph_config) if filter(full_task_graph[l])]
+
+
+@register_target_task("enterprise_thunderbird_with_tests_tasks")
+def target_tasks_enterprise_thunderbird_with_tests(
+    full_task_graph, parameters, graph_config
+):
+    def filter(task):
+        if task.attributes.get("shippable", False):
+            return False
+
+        if task.kind not in ["build", "test"]:
+            return False
+
+        return True
+
+    return [l for l in target_tasks_enterprise_firefox_with_tests(full_task_graph, parameters, graph_config) if filter(full_task_graph[l])]

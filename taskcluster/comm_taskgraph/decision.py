@@ -15,7 +15,7 @@ from taskgraph.util.vcs import get_repository
 from gecko_taskgraph.decision import ARTIFACTS_DIR, write_artifact
 from gecko_taskgraph.parameters import get_app_version, get_version
 from gecko_taskgraph.util.backstop import is_backstop
-from gecko_taskgraph.util.hg import get_hg_commit_message, get_hg_revision_info
+from gecko_taskgraph.util.hg import get_hg_revision_info
 from gecko_taskgraph.util.partials import populate_release_history
 from gecko_taskgraph.util.taskgraph import (
     find_decision_task,
@@ -66,6 +66,16 @@ PER_PROJECT_PARAMETERS = {
     "comm-esr153": {
         "target_tasks_method": "mozilla_esr153_tasks",
         "release_type": "esr153",
+    },
+    # Enterprise, will be improved later.
+    "enterprise-thunderbird": {
+        "target_tasks_method": "enterprise_thunderbird_with_tests_tasks",
+        "release_product": "thunderbird-enterprise",
+    },
+    "enterprise-thunderbird-try": {
+        "enable_always_target": True,
+        "release_product": "thunderbird-enterprise",
+        "target_tasks_method": "try_tasks",
     },
 }
 
@@ -134,7 +144,7 @@ def restore_options():
 def get_decision_parameters(graph_config, parameters):
     logger.info("{}.get_decision_parameters called".format(__name__))
 
-    commit_message = get_hg_commit_message(COMM)
+    commit_message = "" # get_hg_commit_message(COMM)
     options = restore_options()
 
     # Apply default values for all Thunderbird CI projects - override some Gecko defaults!
