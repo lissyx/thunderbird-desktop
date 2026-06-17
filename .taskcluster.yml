@@ -52,6 +52,8 @@
 #   }
 ---
 version: 1
+policy:
+    pullRequests: collaborators
 tasks:
     # NOTE: support for actions in ci-admin requires that the `tasks` property be an array *before* JSON-e rendering
     # takes place.
