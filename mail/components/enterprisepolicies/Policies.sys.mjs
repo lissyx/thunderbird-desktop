@@ -311,7 +311,14 @@ export var Policies = {
       if (param) {
         lazy.blockAboutPage(manager, "about:config");
         lazy.PoliciesUtils.setAndLockPref("devtools.chrome.enabled", false);
+      } else {
+        lazy.unblockAboutPage(manager, "about:config");
+        lazy.PoliciesUtils.setAndLockPref("devtools.chrome.enabled", true);
       }
+    },
+    onRemove(manager, _) {
+      unblockAboutPage(manager, "about:config");
+      // TODO: unsetAndUnlockPref("devtools.chrome.enabled");
     },
   },
 
