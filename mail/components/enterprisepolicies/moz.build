@@ -16,6 +16,11 @@ EXTRA_JS_MODULES.policies += [
     "Policies.sys.mjs",
 ]
 
+if CONFIG["MOZ_ENTERPRISE"]:
+    EXTRA_JS_MODULES.policies_browser += [
+        "/browser/components/enterprisepolicies/Policies.sys.mjs",
+    ]
+
 JAR_MANIFESTS += [
     "jar.mn",
 ]
