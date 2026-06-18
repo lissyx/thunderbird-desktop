@@ -32,6 +32,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   processMIMEInfo: "resource://gre/modules/PoliciesHelpers.sys.mjs",
   replacePathVariables: "resource://gre/modules/PoliciesHelpers.sys.mjs",
   runOncePerModification: "resource://gre/modules/PoliciesHelpers.sys.mjs",
+  unblockAboutPage: "resource://gre/modules/PoliciesHelpers.sys.mjs",
 });
 
 const PREF_LOGLEVEL = "browser.policies.loglevel";
@@ -113,9 +114,16 @@ export var Policies = {
       // true, we disallow turning off auto updating, and visa versa.
       if (param) {
         manager.disallowFeature("app-auto-updates-off");
+        manager.allowFeature("app-auto-updates-on");
       } else {
         manager.disallowFeature("app-auto-updates-on");
+        manager.allowFeature("app-auto-updates-off");
       }
+    },
+    onRemove(manager, _oldParams) {
+      // In a default unpolicied state, it is allowed to turn auto updating on or off
+      manager.allowFeature("app-auto-updates-on");
+      manager.allowFeature("app-auto-updates-off");
     },
   },
 
@@ -290,11 +298,20 @@ export var Policies = {
 
   BackgroundAppUpdate: {
     onBeforeAddons(manager, param) {
+      // Logic feels a bit reversed here, but it's correct. If BackgroundAppUpdate is
+      // true, we disallow turning off background updating, and visa versa.
       if (param) {
         manager.disallowFeature("app-background-update-off");
+        manager.allowFeature("app-background-update-on");
       } else {
         manager.disallowFeature("app-background-update-on");
+        manager.allowFeature("app-background-update-off");
       }
+    },
+    onRemove(manager, _oldParams) {
+      // In a default unpolicied state, it is allowed to turn background updating on or off
+      manager.allowFeature("app-background-update-on");
+      manager.allowFeature("app-background-update-off");
     },
   },
 
@@ -302,7 +319,12 @@ export var Policies = {
     onBeforeUIStartup(manager, param) {
       if (param) {
         lazy.blockAboutPage(manager, "about:addons", true);
+      } else {
+        lazy.unblockAboutPage(manager, "about:addons");
       }
+    },
+    onRemove(manager, _oldParams) {
+      lazy.unblockAboutPage(manager, "about:addons");
     },
   },
 
@@ -317,16 +339,41 @@ export var Policies = {
       }
     },
     onRemove(manager, _) {
-      unblockAboutPage(manager, "about:config");
-      // TODO: unsetAndUnlockPref("devtools.chrome.enabled");
+      lazy.unblockAboutPage(manager, "about:config");
+      lazy.PoliciesUtils.unsetAndUnlockPref("devtools.chrome.enabled");
     },
   },
 
   BlockAboutProfiles: {
+    onBeforeAddons(manager, param) {
+      if (param) {
+        manager.disallowFeature("profileManagement");
+      } else {
+        manager.allowFeature("profileManagement");
+      }
+    },
     onBeforeUIStartup(manager, param) {
       if (param) {
         lazy.blockAboutPage(manager, "about:profiles");
+        lazy.blockAboutPage(manager, "about:profilemanager");
+        lazy.blockAboutPage(manager, "about:editprofile");
+        lazy.blockAboutPage(manager, "about:deleteprofile");
+        lazy.blockAboutPage(manager, "about:newprofile");
+      } else {
+        lazy.unblockAboutPage(manager, "about:profiles");
+        lazy.unblockAboutPage(manager, "about:profilemanager");
+        lazy.unblockAboutPage(manager, "about:editprofile");
+        lazy.unblockAboutPage(manager, "about:deleteprofile");
+        lazy.unblockAboutPage(manager, "about:newprofile");
       }
+    },
+    onRemove(manager, _oldParams) {
+      manager.allowFeature("profileManagement");
+      lazy.unblockAboutPage(manager, "about:profiles");
+      lazy.unblockAboutPage(manager, "about:profilemanager");
+      lazy.unblockAboutPage(manager, "about:editprofile");
+      lazy.unblockAboutPage(manager, "about:deleteprofile");
+      lazy.unblockAboutPage(manager, "about:newprofile");
     },
   },
 
@@ -334,7 +381,15 @@ export var Policies = {
     onBeforeUIStartup(manager, param) {
       if (param) {
         lazy.blockAboutPage(manager, "about:support");
+        manager.disallowFeature("aboutSupport");
+      } else {
+        lazy.unblockAboutPage(manager, "about:support");
+        manager.allowFeature("aboutSupport");
       }
+    },
+    onRemove(manager, _oldParams) {
+      lazy.unblockAboutPage(manager, "about:support");
+      manager.allowFeature("aboutSupport");
     },
   },
 
@@ -344,6 +399,9 @@ export var Policies = {
         "network.captive-portal-service.enabled",
         param
       );
+    },
+    onRemove(_manager, _oldParams) {
+      lazy.PoliciesUtils.unsetAndUnlockPref("network.captive-portal-service.enabled");
     },
   },
 
