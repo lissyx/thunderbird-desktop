@@ -32,8 +32,6 @@ use xpcom::{
 
 use crate::client::XpComGraphClient;
 
-extern crate xpcom;
-
 mod client;
 mod error;
 mod outgoing;
@@ -102,17 +100,7 @@ impl XpcomGraphBridge {
     ) -> Result<(), nsresult> {
         log::debug!("Initializing XpcomGraphBridge with endpoint {endpoint}");
 
-        // The ms_graph_tb crate is built from the Graph 1.0 API specification.
-        // Incoming configuration is assumed to exclude the API version, so it
-        // needs to be added to the base endpoint for all API calls here.
-        let mut endpoint = Url::parse(&endpoint.to_utf8()).or(Err(NS_ERROR_INVALID_ARG))?;
-        {
-            let mut endpoint_path = endpoint
-                .path_segments_mut()
-                .or(Err(nserror::NS_ERROR_MALFORMED_URI))?;
-            endpoint_path.push("v1.0");
-        }
-
+        let endpoint = Url::parse(&endpoint.to_utf8()).or(Err(NS_ERROR_INVALID_ARG))?;
         let server = RefPtr::new(server);
 
         let client = XpComGraphClient::new(server, endpoint)?;
@@ -134,7 +122,7 @@ impl XpcomGraphBridge {
     fn check_connectivity(&self, listener: &nsIUrlListener) -> Result<RefPtr<nsIURI>, nsresult> {
         let client = self.client()?;
 
-        let uri = client.base_url().to_string();
+        let uri = client.base_api_url()?.to_string();
         let uri = SafeUri::new(uri)?;
 
         let listener = SafeUrlListener::new(listener);
@@ -360,11 +348,21 @@ impl XpcomGraphBridge {
     ));
     fn change_flag_status(
         &self,
-        _listener: &IExchangeSimpleOperationListener,
-        _message_ids: &ThinVec<nsCString>,
-        _is_flagged: bool,
+        listener: &IExchangeSimpleOperationListener,
+        message_ids: &ThinVec<nsCString>,
+        is_flagged: bool,
     ) -> Result<(), nsresult> {
-        Err(nserror::NS_ERROR_NOT_IMPLEMENTED)
+        let client = self.client()?;
+        let message_ids = message_ids.into_iter().map(ToString::to_string).collect();
+        let listener = SafeExchangeSimpleOperationListener::new(listener);
+
+        moz_task::spawn_local(
+            "change_flag_status",
+            client.change_flag_status(message_ids, is_flagged, listener),
+        )
+        .detach();
+
+        Ok(())
     }
 
     xpcom_method!(change_read_status_all => ChangeReadStatusAll(
@@ -564,12 +562,30 @@ impl XpcomGraphBridge {
     ));
     fn mark_items_as_junk(
         &self,
-        _listener: &IExchangeSimpleOperationListener,
-        _ews_ids: &ThinVec<nsCString>,
+        listener: &IExchangeSimpleOperationListener,
+        ews_ids: &ThinVec<nsCString>,
         _is_junk: bool,
-        _legacy_destination_folder_id: &nsACString,
+        legacy_destination_folder_id: &nsACString,
     ) -> Result<(), nsresult> {
-        Err(nserror::NS_ERROR_NOT_IMPLEMENTED)
+        let client = self.client()?;
+
+        let ews_ids = ews_ids.iter().map(ToString::to_string).collect();
+        let legacy_destination_folder_id = legacy_destination_folder_id.to_utf8().into_owned();
+
+        // NOTE: The is_junk parameter is unused because the Graph 1.0 API does not support a mark
+        // as junk operation. Instead, we use the caller-supplied legacy_destination_folder_id
+        // parameter to initiate a move to the caller-requested folder.
+        moz_task::spawn_local(
+            "mark_items_as_junk",
+            client.mark_items_as_junk(
+                legacy_destination_folder_id,
+                ews_ids,
+                SafeExchangeSimpleOperationListener::new(listener),
+            ),
+        )
+        .detach();
+
+        Ok(())
     }
 
     /// Gets a new reference to the Graph client if initialized. The client is

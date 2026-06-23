@@ -352,12 +352,6 @@ class nsImapMailFolder : public nsMsgDBFolder,
   // send notification to copy service listener.
   nsresult OnCopyCompleted(nsISupports* srcSupport, nsresult exitCode);
 
-  static nsresult AllocateUidStringFromKeys(const nsTArray<nsMsgKey>& keys,
-                                            nsCString& msgIds);
-  static nsresult BuildIdsAndKeyArray(
-      const nsTArray<RefPtr<nsIMsgDBHdr>>& messages, nsCString& msgIds,
-      nsTArray<nsMsgKey>& keyArray);
-
   // these might end up as an nsIImapMailFolder attribute.
   nsresult SetSupportedUserFlags(uint32_t userFlags);
   nsresult GetSupportedUserFlags(uint32_t* userFlags);

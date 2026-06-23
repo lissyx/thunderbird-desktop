@@ -27,7 +27,7 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
         &mut self,
         client: &XpComGraphClient<ServerT>,
     ) -> Result<Self::Okay, XpComGraphError> {
-        let base_url = client.base_url().to_string();
+        let base_url = client.base_api_url()?.to_string();
         let request = messages::message_id::value::Get::new(base_url, self.message_id.clone());
 
         self.listener.on_fetch_start()?;
@@ -54,7 +54,7 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
 use crate::{client::XpComGraphClient, error::XpComGraphError};
 
 impl<ServerT: ServerType> XpComGraphClient<ServerT> {
-    pub async fn get_message(
+    pub(crate) async fn get_message(
         self: Arc<XpComGraphClient<ServerT>>,
         listener: SafeExchangeMessageFetchListener,
         message_id: String,

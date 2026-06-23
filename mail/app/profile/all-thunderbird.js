@@ -1415,7 +1415,8 @@ pref("toolkit.telemetry.bhrPing.enabled", true);
 #endif
 
 #ifdef XP_WIN
-pref("mail.minimizeToTray", false);
+pref("mail.closeToTray", false);
+pref("mail.closeToTray.startInTray", false);
 #endif
 
 pref("prompts.defaultModalType", 3);
@@ -1544,7 +1545,7 @@ pref("mail.dark-reader.show-toggle", true);
 pref("mail.accounthub.addressbook.enabled", true);
 
 // Enable Thundermail ui in account hub.
-pref("mail.accounthub.thundermail.enabled", false);
+pref("mail.accounthub.thundermail.enabled", true);
 
 // Enable new manual config ui in account hub.
 pref("mail.accounthub.manualconfig.enabled", false);

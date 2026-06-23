@@ -16,9 +16,9 @@ git = "https://github.com/franziskuskiefer/cose-rust"
 rev = "43c22248d136c8b38fe42ea709d08da6355cf04b"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"]
+[source."git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976"]
 git = "https://github.com/gfx-rs/wgpu"
-rev = "6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+rev = "43981de526bffe6773403029c2e26f18d9c0a976"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/glandium/allocator-api2?rev=ad5f3d56a5a4519eff52af4ff85293431466ef5c"]
@@ -56,13 +56,14 @@ git = "https://github.com/libjxl/jxl-rs"
 rev = "c41cbfaf34c2c8ebc3fb6655c885fe427ab9542a"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/martinthomson/ohttp"]
+[source."git+https://github.com/martinthomson/ohttp?rev=600931b5a1e947776cbaad931ed78f1e89005352"]
 git = "https://github.com/martinthomson/ohttp"
+rev = "600931b5a1e947776cbaad931ed78f1e89005352"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/audioipc?rev=042d48dc5932ced772c2bf20a2aef2845fd6ec85"]
+[source."git+https://github.com/mozilla/audioipc?rev=c9dcbaee1624daad2fa6b1445fd047efde4f1ec0"]
 git = "https://github.com/mozilla/audioipc"
-rev = "042d48dc5932ced772c2bf20a2aef2845fd6ec85"
+rev = "c9dcbaee1624daad2fa6b1445fd047efde4f1ec0"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/mozilla/authenticator-rs?tag=v0.6.0"]
@@ -80,9 +81,9 @@ git = "https://github.com/mozilla/cubeb-pulse-rs"
 rev = "3cf4a1af09a1748d0e184297a17132bdcc608874"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/happy-eyeballs?tag=v0.6.0"]
+[source."git+https://github.com/mozilla/happy-eyeballs?tag=v0.8.0"]
 git = "https://github.com/mozilla/happy-eyeballs"
-tag = "v0.6.0"
+tag = "v0.8.0"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/mozilla/memtest?rev=ad681ba425beb0aeba95f03e671432b4be932174"]
@@ -100,9 +101,9 @@ git = "https://github.com/mozilla/mls-platform-api"
 rev = "2a2e344019bfc76b7e566ee6e0549cf668d90127"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/mp4parse-rust?rev=fb7ed9effb5eae0f3768c2c5ec0a63c61f35ba60"]
+[source."git+https://github.com/mozilla/mp4parse-rust?rev=b693c7e4a91d1d5a391c0404d18b6fc94714894e"]
 git = "https://github.com/mozilla/mp4parse-rust"
-rev = "fb7ed9effb5eae0f3768c2c5ec0a63c61f35ba60"
+rev = "b693c7e4a91d1d5a391c0404d18b6fc94714894e"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/mozilla/neqo?tag=v0.29.0"]

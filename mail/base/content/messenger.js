@@ -102,6 +102,8 @@ var delayedStartupPromise = new Promise(resolve => {
   _resolveDelayedStartup = resolve;
 });
 
+let _restoredWindowStatePromise;
+
 var gMailInit = {
   onBeforeInitialXULLayout() {
     // Set a sane starting width/height for all resolutions on new profiles.
@@ -131,6 +133,52 @@ var gMailInit = {
     // Call this after we set attributes that might change toolbars' computed
     // text color.
     ToolbarIconColor.init();
+
+    // Check if this is the first window, initialize the SessionStoreManager.
+    // This will restore other windows once the session state has been loaded.
+    const firstWindow = !SessionStoreManager.initialized;
+    _restoredWindowStatePromise = SessionStoreManager.loadingWindow(window);
+
+    // Hide this window on startup (if required).
+    this._startInTray(firstWindow);
+  },
+
+  _startInTrayEnabled() {
+    const closeToTray = Services.prefs.getBoolPref("mail.closeToTray", false);
+    return (
+      closeToTray &&
+      Services.prefs.getBoolPref("mail.closeToTray.startInTray", false)
+    );
+  },
+
+  async _startInTray(firstWindow) {
+    if (!this._startInTrayEnabled()) {
+      return;
+    }
+
+    // When start in tray is enabled, hide the first window as well as all
+    // windows restored by the SessionStoreManager.
+    const hideWindow = () => {
+      const baseWindow = window.docShell.treeOwner.QueryInterface(
+        Ci.nsIBaseWindow
+      );
+      Cc["@mozilla.org/messenger/osintegration;1"]
+        .getService(Ci.nsIMessengerWindowsIntegration)
+        .hideWindow(baseWindow);
+    };
+
+    if (firstWindow) {
+      // This is the first window ever displayed, hide it now.
+      hideWindow();
+      return;
+    }
+
+    const restoredWindowState = await _restoredWindowStatePromise;
+    if (restoredWindowState != null) {
+      // This window is one of the windows that are being restored, hide it as
+      // soon as its state is known.
+      hideWindow();
+    }
   },
 
   /**
@@ -190,16 +238,25 @@ var gMailInit = {
 
     window.addEventListener("AppCommand", HandleAppCommandEvent, true);
 
-    this._boundDelayedStartup = this._delayedStartup.bind(this);
-    window.addEventListener("MozAfterPaint", this._boundDelayedStartup);
-
     // Listen for the messages sent to the main 3 pane window.
     window.addEventListener("message", this._onMessageReceived);
+
+    if (!this._startInTrayEnabled()) {
+      // Perform delayed startup after the first paint of the window.
+      this._boundDelayedStartup = this._delayedStartup.bind(this);
+      window.addEventListener("MozAfterPaint", this._boundDelayedStartup);
+    } else {
+      // Start to tray is enabled, the window will not be painted straight away.
+      // Perform delayed startup now.
+      this._delayedStartup();
+    }
   },
 
   _cancelDelayedStartup() {
-    window.removeEventListener("MozAfterPaint", this._boundDelayedStartup);
-    this._boundDelayedStartup = null;
+    if (this._boundDelayedStartup) {
+      window.removeEventListener("MozAfterPaint", this._boundDelayedStartup);
+      this._boundDelayedStartup = null;
+    }
   },
 
   /**
@@ -290,6 +347,15 @@ var gMailInit = {
     // Don't trigger the existing account verification if the user wants to use
     // Thunderbird without an email account.
     if (!Services.prefs.getBoolPref("app.use_without_mail_account", false)) {
+      // This is as much restoring we'll do. Notify to hook up enterprice
+      // policies properly.
+      Services.obs.notifyObservers(window, "sessionstore-windows-restored");
+      // For the crash monitor.
+      Services.obs.notifyObservers(
+        window,
+        "sessionstore-final-state-write-complete"
+      );
+
       // Load the Mail UI only if we already have at least one account configured
       // otherwise the verifyExistingAccounts will trigger the account wizard.
       verifyExistingAccounts();
@@ -546,7 +612,7 @@ function getWindowStateForSessionPersistence() {
  * @returns {boolean} true if the restoration was successful, false otherwise.
  */
 async function atStartupRestoreTabs(aDontRestoreFirstTab) {
-  const state = await SessionStoreManager.loadingWindow(window);
+  const state = await _restoredWindowStatePromise;
   if (state) {
     const tabsState = state.tabs;
     const tabmail = document.getElementById("tabmail");
@@ -563,6 +629,13 @@ async function atStartupRestoreTabs(aDontRestoreFirstTab) {
   // Note: The tabs have not finished loading at this point.
   SessionStoreManager._restored = true;
   Services.obs.notifyObservers(window, "mail-tabs-session-restored");
+  // We only restore one window, so this is it...
+  Services.obs.notifyObservers(window, "sessionstore-windows-restored");
+  // For the crash monitor.
+  Services.obs.notifyObservers(
+    window,
+    "sessionstore-final-state-write-complete"
+  );
 
   return !!state;
 }

@@ -724,7 +724,8 @@ NS_IMETHODIMP ExchangeIncomingServer::GetProtocolClient(
   return NS_OK;
 }
 
-nsresult ExchangeIncomingServer::GetTrashFolder(nsIMsgFolder** trashFolder) {
+NS_IMETHODIMP
+ExchangeIncomingServer::GetTrashFolder(nsIMsgFolder** trashFolder) {
   NS_ENSURE_ARG_POINTER(trashFolder);
 
   *trashFolder = nullptr;
@@ -894,13 +895,17 @@ nsresult GetDetailsForHostname(ExchangeIncomingServer* server,
                                ExchangeOAuth2CustomDetails** details) {
   NS_ENSURE_ARG_POINTER(details);
 
+  nsAutoCString type;
+  nsresult rv = server->GetType(type);
+  NS_ENSURE_SUCCESS(rv, rv);
+
   nsAutoCString hostname;
-  nsresult rv = server->GetHostName(hostname);
+  rv = server->GetHostname(hostname);
   NS_ENSURE_SUCCESS(rv, rv);
 
   RefPtr<ExchangeOAuth2CustomDetails> result;
-  rv = ExchangeOAuth2CustomDetails::ForHostname(hostname,
-                                                getter_AddRefs(result));
+  rv = ExchangeOAuth2CustomDetails::ForTypeAndHostname(type, hostname,
+                                                       getter_AddRefs(result));
   NS_ENSURE_SUCCESS(rv, rv);
 
   result.forget(details);

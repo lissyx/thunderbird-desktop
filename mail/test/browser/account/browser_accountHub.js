@@ -110,8 +110,9 @@ add_task(async function test_account_email_step() {
   nameInput.value = "";
   emailInput.value = "";
 
-  // Check if the input icons are hidden.
-  const icons = emailTemplate.querySelectorAll("img");
+  // Validation/status icons should be hidden initially.
+  // Provider login buttons may contain visible images.
+  const icons = emailTemplate.querySelectorAll("img.form-icon");
 
   for (const icon of icons) {
     Assert.ok(BrowserTestUtils.isHidden(icon), `${icon.src} should be hidden`);
@@ -611,6 +612,10 @@ add_task(async function test_account_enter_password_imap_account() {
 
   // The back button should be hidden now, as we shouldn't be able to cancel
   // account creation.
+  await BrowserTestUtils.waitForAttribute(
+    "hidden",
+    footer.querySelector("#back")
+  );
   Assert.ok(
     BrowserTestUtils.isHidden(footer.querySelector("#back")),
     "Back button should be hidden."

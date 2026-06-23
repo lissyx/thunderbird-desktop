@@ -637,7 +637,7 @@ function checkUserServerChanges(showAlert) {
 
   // Get the new username, hostname and type from the page.
   var typeElem = getPageFormElement("server.type");
-  var hostElem = getPageFormElement("server.hostName");
+  var hostElem = getPageFormElement("server.hostname");
   var userElem = getPageFormElement("server.username");
   if (typeElem && userElem && hostElem) {
     var newType = getFormElementValue(typeElem);
@@ -645,7 +645,7 @@ function checkUserServerChanges(showAlert) {
       currentAccount,
       accountValues,
       "server",
-      "hostName",
+      "hostname",
       null,
       false
     );
@@ -891,13 +891,6 @@ function markDefaultServer(newDefault, oldDefault) {
       accountRow.classList.remove("isDefaultServer");
     }
   }
-}
-
-/**
- * Notify the UI to rebuild the account tree.
- */
-function rebuildAccountTree() {
-  // TODO: Reimplement or replace.
 }
 
 /**
@@ -1292,7 +1285,7 @@ function loadPage(pageId) {
 
 // save the values of the widgets to the given server
 function savePage(account) {
-  if (!account) {
+  if (!account || !MailServices.accounts.getAccount(account.key)) {
     return;
   }
 
@@ -1657,7 +1650,6 @@ function setAccountLabel(aAccountKey, aLabel) {
     row.title = aLabel;
     row.querySelector(".name").textContent = aLabel;
   }
-  rebuildAccountTree(false);
 }
 
 var gAccountTree = {
@@ -1690,7 +1682,6 @@ var gAccountTree = {
       const accountKeyList = Array.from(mainTree.children, row => row.id);
       accountKeyList.pop(); // Remove SMTP.
       MailServices.accounts.reorderAccounts(accountKeyList);
-      rebuildAccountTree();
     });
     mainTree.addEventListener("expanded", event => {
       this._dataStore.setValue(

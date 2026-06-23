@@ -32,7 +32,7 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
         &mut self,
         client: &XpComGraphClient<ServerT>,
     ) -> Result<Self::Okay, XpComGraphError> {
-        let base_url = client.base_url();
+        let base_url = client.base_api_url()?;
 
         log::info!("Start running for URI {base_url}");
         self.listener
@@ -68,7 +68,7 @@ impl<ServerT: ServerType> XpComGraphClient<ServerT> {
     /// Perform a connectivity check by querying the [user information] endpoint.
     ///
     /// [user information]: https://learn.microsoft.com/en-us/graph/api/user-get
-    pub async fn check_connectivity(
+    pub(crate) async fn check_connectivity(
         self: Arc<XpComGraphClient<ServerT>>,
         uri: SafeUri,
         listener: SafeUrlListener,

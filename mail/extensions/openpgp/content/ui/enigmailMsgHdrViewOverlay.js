@@ -292,28 +292,6 @@ Enigmail.hdrView = {
       this.msgSignedStateString = signed;
     }
     this.updateVisibleSecurityStatus(triggeredByMimePartNumber);
-
-    if (encrypted) {
-      // For telemetry purposes.
-      window.dispatchEvent(
-        new CustomEvent("secureMsgLoaded", {
-          detail: {
-            key: "encrypted-openpgp",
-            data: encrypted,
-          },
-        })
-      );
-    }
-    if (signed) {
-      window.dispatchEvent(
-        new CustomEvent("secureMsgLoaded", {
-          detail: {
-            key: "signed-openpgp",
-            data: signed,
-          },
-        })
-      );
-    }
   },
 
   /**
@@ -657,8 +635,10 @@ var openpgpSink = {
 
   /**
    * @param {string} uri - URI to handle.
+   * @param {string} mimePartNumber - MIME part number being processed.
+   * @param {string} contentType - Content type of the processed part.
    */
-  handleSMimeMessage(uri) {
+  handleSMimeMessage(uri, mimePartNumber, contentType) {
     if (
       Enigmail.hdrView.msgSignedStateString != null ||
       Enigmail.hdrView.msgEncryptedStateString != null
@@ -666,6 +646,15 @@ var openpgpSink = {
       // If we already processed an OpenPGP part, then we are handling
       // a message with an inner S/MIME part. We must not reload
       // the message here, because we'd run into an endless loop.
+      return;
+    }
+    if (
+      !Enigmail.msg.mayChangeHandlerForPart(
+        mimePartNumber,
+        currentHeaderData?.["content-type"]?.headerValue || "",
+        contentType
+      )
+    ) {
       return;
     }
     if (EnigmailFuncs.isCurrentMessage(gMessageURI, uri)) {

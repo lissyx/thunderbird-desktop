@@ -12,6 +12,9 @@ const { OSKeyStore } = ChromeUtils.importESModule(
 const { OSKeyStoreTestUtils } = ChromeUtils.importESModule(
   "resource://testing-common/OSKeyStoreTestUtils.sys.mjs"
 );
+const { CreateInBackend } = ChromeUtils.importESModule(
+  "resource:///modules/accountcreation/CreateInBackend.sys.mjs"
+);
 
 add_task(async () => {
   await testCheckboxes(
@@ -882,6 +885,8 @@ add_task(async function testSecurityDialogs() {
  * Tests the keyserver settings.
  */
 add_task(async function testKeyServers() {
+  const numDefaultKeyservers = 3;
+
   const { prefsDocument, prefsWindow } = await openNewPrefsTab(
     "panePrivacy",
     "privacyPasswordsCategory"
@@ -896,7 +901,7 @@ add_task(async function testKeyServers() {
     {
       childList: true,
     },
-    () => keyServerList.children.length == 3
+    () => keyServerList.children.length == numDefaultKeyservers + 1
   );
 
   // Initial state based on "mail.openpgp.keyserver_list".
@@ -904,7 +909,11 @@ add_task(async function testKeyServers() {
   const keyServers = Services.prefs
     .getStringPref("mail.openpgp.keyserver_list")
     .split(/,\s*/);
-  Assert.equal(keyServers.length, 2, "should start with 2 servers");
+  Assert.equal(
+    keyServers.length,
+    numDefaultKeyservers,
+    `should start with ${numDefaultKeyservers} servers`
+  );
 
   // Toggle a checkbox (to remove server from pref).
 
@@ -971,10 +980,12 @@ add_task(async function testKeyServers() {
   await BrowserTestUtils.waitForMutationCondition(
     keyServerList,
     { childList: true },
-    () => keyServerList.querySelectorAll(":scope > li").length == 3
+    () =>
+      keyServerList.querySelectorAll(":scope > li").length ==
+      numDefaultKeyservers + 1
   );
   Assert.equal(
-    3,
+    numDefaultKeyservers + 1,
     keyServerList.querySelectorAll(":scope > li").length,
     "should have correct servers listed after add"
   );
@@ -1032,10 +1043,12 @@ add_task(async function testKeyServers() {
   await BrowserTestUtils.waitForMutationCondition(
     keyServerList,
     { childList: true },
-    () => keyServerList.querySelectorAll(":scope > li").length == 2
+    () =>
+      keyServerList.querySelectorAll(":scope > li").length ==
+      numDefaultKeyservers
   );
   Assert.equal(
-    2,
+    numDefaultKeyservers,
     keyServerList.querySelectorAll(":scope > li").length,
     "should have initial servers listed after reset"
   );

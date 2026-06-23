@@ -199,15 +199,15 @@ add_task(async function test_exchange_requires_credentials_account_creation() {
     configFoundTemplate.l10n.getAttributes(
       configFoundTemplate.querySelector("#incomingSocketType")
     ).id,
-    "account-hub-result-ssl",
+    "account-hub-result-security-ssl",
     "Incoming socket type should be expected type"
   );
 
   Assert.equal(
     configFoundTemplate.l10n.getAttributes(
-      configFoundTemplate.querySelector("#authenticationType")
+      configFoundTemplate.querySelector("#incomingAuthenticationType")
     ).id,
-    "account-hub-result-auth-password",
+    "account-hub-result-authentication-password",
     "Authentication type should be expected type"
   );
 
@@ -324,15 +324,15 @@ add_task(
       configFoundTemplate.l10n.getAttributes(
         configFoundTemplate.querySelector("#incomingSocketType")
       ).id,
-      "account-hub-result-ssl",
+      "account-hub-result-security-ssl",
       "Incoming socket type should be expected type"
     );
 
     Assert.equal(
       configFoundTemplate.l10n.getAttributes(
-        configFoundTemplate.querySelector("#authenticationType")
+        configFoundTemplate.querySelector("#incomingAuthenticationType")
       ).id,
-      "account-hub-result-auth-password",
+      "account-hub-result-authentication-password",
       "Authentication type should be expected type"
     );
 
@@ -581,12 +581,12 @@ add_task(async function test_exchange_graph_advanced_configuration() {
     incomingForm,
     "config-updated",
     false,
-    () => exchangeURLField.value == "https://graph.microsoft.com/v1.0"
+    () => exchangeURLField.value == "https://graph.microsoft.com/"
   );
   const focusEvent = BrowserTestUtils.waitForEvent(exchangeURLField, "focus");
   EventUtils.synthesizeMouseAtCenter(exchangeURLField, {});
   await focusEvent;
-  EventUtils.sendString("https://graph.microsoft.com/v1.0");
+  EventUtils.sendString("https://graph.microsoft.com/");
   ({ detail: configUpdatedEvent } = await configUpdatedEventPromise);
 
   Assert.ok(
@@ -605,7 +605,7 @@ add_task(async function test_exchange_graph_advanced_configuration() {
 
   Assert.equal(
     graphAccount.incomingServer.getStringValue("ews_url"),
-    "https://graph.microsoft.com/v1.0",
+    "https://graph.microsoft.com/",
     "The Exchange URL should be a Graph API URL."
   );
 
@@ -758,16 +758,16 @@ add_task(async function test_full_exchange_account_creation() {
     configFoundTemplate.l10n.getAttributes(
       configFoundTemplate.querySelector("#incomingSocketType")
     ).id,
-    "account-hub-result-ssl",
+    "account-hub-result-security-ssl",
     "Incoming socket type should be expected type"
   );
 
   Assert.equal(
     configFoundTemplate.l10n.getAttributes(
-      configFoundTemplate.querySelector("#authenticationType")
+      configFoundTemplate.querySelector("#incomingAuthenticationType")
     ).id,
-    "account-hub-result-auth-password",
-    "Authentication type should be expected type"
+    "account-hub-result-authentication-password",
+    "Incoming authentication type should be expected type"
   );
 
   Assert.equal(
@@ -1048,7 +1048,7 @@ async function chooseAdvancedSetup(incomingConfigForm, dialog) {
   // The dialog should automatically close after clicking advanced config
   await BrowserTestUtils.waitForEvent(dialog, "close");
 
-  await BrowserTestUtils.waitForCondition(
+  await TestUtils.waitForCondition(
     () => tabmail.selectedTab != oldTab,
     "The tab should change to the account settings tab"
   );

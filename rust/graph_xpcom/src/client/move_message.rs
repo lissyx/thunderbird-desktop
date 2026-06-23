@@ -4,10 +4,7 @@
 
 use std::sync::Arc;
 
-use ms_graph_tb::{
-    OperationBody,
-    paths::me::messages::{self, message_id::r#move},
-};
+use ms_graph_tb::{OperationBody, paths::me::messages::message_id::r#move};
 use nsstring::nsCString;
 use protocol_shared::{
     ServerType,
@@ -37,34 +34,9 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
         &mut self,
         client: &XpComGraphClient<ServerT>,
     ) -> Result<Self::Okay, XpComGraphError> {
-        // Note: the C++ consumer code expects the order of new messages IDs to
-        // match that of the old ones (so that e.g. `new_message_ids[0]` is the
-        // new ID for `self.message_ids[0]`).
-        let requests = self
-            .message_ids
-            .iter()
-            .map(|message_id| {
-                client.move_message_request(self.destination_folder_id.clone(), message_id.clone())
-            })
-            .collect();
-
-        let responses = client
-            .send_batch_request_json_response(requests, Default::default())
-            .await?;
-
-        let new_message_ids = responses
-            .iter()
-            .filter_map(|response| {
-                response
-                    .outlook_item()
-                    .entity()
-                    .id()
-                    .ok()
-                    .map(ToString::to_string)
-            })
-            .collect();
-
-        Ok(new_message_ids)
+        client
+            .move_messages_to_folder(&self.destination_folder_id, self.message_ids.clone())
+            .await
     }
 
     fn into_success_arg(
@@ -108,6 +80,44 @@ impl<ServerT: ServerType> XpComGraphClient<ServerT> {
         operation.handle_operation(&self, &listener).await;
     }
 
+    /// Moves messages to a specific folder.
+    ///
+    /// This is a shared implementation used by both [`move_messages`] and
+    /// [`mark_items_as_junk`].
+    pub(crate) async fn move_messages_to_folder(
+        &self,
+        destination_folder_id: &str,
+        message_ids: Vec<String>,
+    ) -> Result<ThinVec<String>, XpComGraphError> {
+        // Note: the C++ consumer code expects the order of new messages IDs to
+        // match that of the old ones (so that e.g. `new_message_ids[0]` is the
+        // new ID for `self.message_ids[0]`).
+        let requests = message_ids
+            .iter()
+            .map(|message_id| {
+                self.move_message_request(destination_folder_id.to_string(), message_id.clone())
+            })
+            .collect::<Result<Vec<r#move::Post<'_>>, XpComGraphError>>()?;
+
+        let responses = self
+            .send_batch_request_json_response(requests, Default::default())
+            .await?;
+
+        let new_message_ids = responses
+            .iter()
+            .filter_map(|response| {
+                response
+                    .outlook_item()
+                    .entity()
+                    .id()
+                    .ok()
+                    .map(ToString::to_string)
+            })
+            .collect();
+
+        Ok(new_message_ids)
+    }
+
     /// Creates a [message move] request for the given message.
     ///
     /// [message move]: https://learn.microsoft.com/en-us/graph/api/message-move
@@ -115,14 +125,15 @@ impl<ServerT: ServerType> XpComGraphClient<ServerT> {
         &'m self,
         destination_folder_id: String,
         message_id: String,
-    ) -> r#move::Post<'m> {
-        let body = messages::message_id::r#move::PostRequestBody::new()
-            .set_destination_id(destination_folder_id);
+    ) -> Result<r#move::Post<'m>, XpComGraphError> {
+        let body = r#move::PostRequestBody::new().set_destination_id(destination_folder_id);
 
-        messages::message_id::r#move::Post::new(
-            self.base_url().to_string(),
+        let base_api_url = self.base_api_url()?;
+
+        Ok(r#move::Post::new(
+            base_api_url.to_string(),
             message_id,
             OperationBody::JSON(body),
-        )
+        ))
     }
 }

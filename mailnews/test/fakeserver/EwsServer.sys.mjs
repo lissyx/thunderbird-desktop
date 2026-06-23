@@ -793,6 +793,11 @@ export class EwsServer extends MockServer {
 
     this.#setVersion(resDoc);
 
+    const maxChanges =
+      reqDoc.getElementsByTagName("MaxChangesReturned")[0].firstChild.nodeValue;
+
+    this.lastMaxMessagePageSize = parseInt(maxChanges);
+
     const syncFolderId = reqDoc
       .getElementsByTagName("SyncFolderId")[0]
       .getElementsByTagName("t:FolderId")[0]
@@ -1238,17 +1243,17 @@ export class EwsServer extends MockServer {
       // 2. Set the Extended property with property tag 4240.
       const flagEl = itemChange.getElementsByTagName("t:Flag")[0];
       if (flagEl) {
-        const flagStatusEl = flagEl.getElementsByTagName("t:FlagStatus")[0];
+        const flagStatusEl = flagEl.getElementsByTagName("FlagStatus")[0];
         const extendedPropertyEl =
-          itemChange.getElementsByTagName("ExtendedProperty")[0];
+          itemChange.getElementsByTagName("t:ExtendedProperty")[0];
         if (flagStatusEl && extendedPropertyEl) {
           const fieldUriEl =
-            extendedPropertyEl.getElementsByTagName("t:ExtendedFieldUri")[0];
+            extendedPropertyEl.getElementsByTagName("t:ExtendedFieldURI")[0];
           if (fieldUriEl) {
             const propertyTag = fieldUriEl.getAttribute("PropertyTag");
             if (propertyTag == "4240") {
               const valueEl =
-                extendedPropertyEl.getElementsByTagName("t:Value");
+                extendedPropertyEl.getElementsByTagName("t:Value")[0];
               if (valueEl) {
                 const flagStatusValue = flagStatusEl.textContent;
                 const extendedPropertyValue = valueEl.textContent;

@@ -10,13 +10,14 @@ use ms_graph_tb::{
     pagination::{DeltaItem, DeltaResponse},
     paths::me::mail_folders::mail_folder_id::messages,
     types::{
+        followup_flag_status::FollowupFlagStatus,
         internet_message_header::InternetMessageHeader,
         message::{Message, MessageSelection},
         recipient::Recipient,
     },
 };
 use protocol_shared::{
-    ServerType,
+    EXCHANGE_MAX_PAGE_SIZE, ServerType,
     client::DoOperation,
     headerblock_xpcom::{HeaderBlock, rfc5322_header},
     headers::Mailbox,
@@ -62,6 +63,7 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
                     MessageSelection::BodyPreview,
                     MessageSelection::CcRecipients,
                     MessageSelection::From,
+                    MessageSelection::Flag,
                     MessageSelection::Importance,
                     MessageSelection::InternetMessageHeaders,
                     MessageSelection::InternetMessageId,
@@ -76,9 +78,10 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
                     MessageSelection::ToRecipients,
                 ];
 
-                let base_url = client.base_url().to_string();
+                let base_url = client.base_api_url()?.to_string();
                 let folder_id = self.folder_id.clone();
                 let mut request = messages::delta::Get::new(base_url, folder_id);
+                request.set_max_page_size(EXCHANGE_MAX_PAGE_SIZE);
                 request.select(select_properties);
                 request.expand_typed_svlep([PID_TAG_MESSAGE_SIZE]);
                 client
@@ -106,10 +109,8 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
                             message: "isRead not present in response despite being requested"
                                 .into(),
                         })?;
-                        // TODO
-                        // (https://bugzilla.mozilla.org/show_bug.cgi?id=2025019)
-                        // Get message flagged status.
-                        let is_flagged = false;
+                        let is_flagged =
+                            message.flag()?.flag_status()? == FollowupFlagStatus::Flagged;
                         let preview_text = message.body_preview().unwrap_or(None).unwrap_or("");
 
                         log::debug!("Found message in response with ID {message_id}");
@@ -152,7 +153,8 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
             }
 
             match response {
-                DeltaResponse::NextLink { next_page, .. } => {
+                DeltaResponse::NextLink { mut next_page, .. } => {
+                    next_page.set_max_page_size(EXCHANGE_MAX_PAGE_SIZE);
                     response = client
                         .send_request_json_response(next_page, Default::default())
                         .await?;
@@ -174,7 +176,7 @@ impl<ServerT: ServerType> DoOperation<XpComGraphClient<ServerT>, XpComGraphError
 }
 
 impl<ServerT: ServerType> XpComGraphClient<ServerT> {
-    pub async fn sync_messages_for_folder(
+    pub(crate) async fn sync_messages_for_folder(
         self: Arc<XpComGraphClient<ServerT>>,
         listener: SafeExchangeMessageSyncListener,
         folder_id: String,

@@ -1,5 +1,5 @@
-FROM freedesktopsdk/flatpak:25.08-x86_64
-MAINTAINER daniel@thunderbird.net
+FROM ghcr.io/flathub/flatpak-builder-lint@sha256:89e3512219fcad8caac39a8c7088748d0a9077396845610b0976cb5e5aead91c
+LABEL org.opencontainers.image.authors="daniel@thunderbird.net"
 
 # Create scripts directory
 RUN mkdir /scripts/
@@ -27,8 +27,8 @@ RUN /scripts/make_venv.sh /scripts/fluent_requirements.txt
 RUN ["gcc", "-Wall", "-shared", "-o", "/scripts/close_range.so", "/scripts/close_range.c"]
 ENV LD_PRELOAD /scripts/close_range.so
 
-# Install flatpak-builder-lint
-RUN pip3 install git+https://github.com/flathub-infra/flatpak-builder-lint.git
+# Override the base image's own ENTRYPOINT (the linter tool itself)
+ENTRYPOINT []
 
 # Set a default command useful for debugging
 CMD ["/bin/bash", "--login"]

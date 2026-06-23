@@ -344,7 +344,7 @@ dependencies = [
 [[package]]
 name = "audioipc2"
 version = "0.6.0"
-source = "git+https://github.com/mozilla/audioipc?rev=042d48dc5932ced772c2bf20a2aef2845fd6ec85#042d48dc5932ced772c2bf20a2aef2845fd6ec85"
+source = "git+https://github.com/mozilla/audioipc?rev=c9dcbaee1624daad2fa6b1445fd047efde4f1ec0#c9dcbaee1624daad2fa6b1445fd047efde4f1ec0"
 dependencies = [
  "arrayvec",
  "ashmem",
@@ -370,7 +370,7 @@ dependencies = [
 [[package]]
 name = "audioipc2-client"
 version = "0.6.0"
-source = "git+https://github.com/mozilla/audioipc?rev=042d48dc5932ced772c2bf20a2aef2845fd6ec85#042d48dc5932ced772c2bf20a2aef2845fd6ec85"
+source = "git+https://github.com/mozilla/audioipc?rev=c9dcbaee1624daad2fa6b1445fd047efde4f1ec0#c9dcbaee1624daad2fa6b1445fd047efde4f1ec0"
 dependencies = [
  "audio_thread_priority",
  "audioipc2",
@@ -381,7 +381,7 @@ dependencies = [
 [[package]]
 name = "audioipc2-server"
 version = "0.6.0"
-source = "git+https://github.com/mozilla/audioipc?rev=042d48dc5932ced772c2bf20a2aef2845fd6ec85#042d48dc5932ced772c2bf20a2aef2845fd6ec85"
+source = "git+https://github.com/mozilla/audioipc?rev=c9dcbaee1624daad2fa6b1445fd047efde4f1ec0#c9dcbaee1624daad2fa6b1445fd047efde4f1ec0"
 dependencies = [
  "audio_thread_priority",
  "audioipc2",
@@ -892,18 +892,18 @@ dependencies = [
 
 [[package]]
 name = "clubcard"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ec3fe691cfeac642b45d2acee55f4c745fe9eed548380fd41d1fb7daf54297c"
+checksum = "3ef474a1b4f0f838c9f513e224f6b5b74ee63a55d9ec42874bfb343b0fce29c8"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "clubcard-crlite"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd2c6f668aeaab6cf4c9637400ce5bc1f7ab1cf9b424dd0125273f16bd26ca25"
+checksum = "94db8308070798e004eba1d535f6fb78e3ba7170deb40ab767776d3025747707"
 dependencies = [
  "base64 0.21.999",
  "bincode",
@@ -1149,9 +1149,11 @@ dependencies = [
  "mach2",
  "minidump-writer",
  "mozannotation_server",
+ "mozbuild",
  "nix",
  "num-derive",
  "num-traits",
+ "process_reader",
  "thiserror 2.0.12",
  "windows-sys",
  "yaml-rust2",
@@ -1638,6 +1640,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "dom_speculationrules"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "nsstring",
+ "regex",
+ "serde",
+ "serde_json",
+ "thin-vec",
+ "url",
+ "urlpattern",
+]
+
+[[package]]
 name = "dtoa"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1883,7 +1900,6 @@ dependencies = [
  "fxhash",
  "http 0.2.12",
  "log",
- "mailnews_ui_glue",
  "moz_http",
  "moz_task",
  "nserror",
@@ -2505,6 +2521,7 @@ dependencies = [
  "data_storage",
  "dom",
  "dom_fragmentdirectives",
+ "dom_speculationrules",
  "encoding_glue",
  "etagere",
  "ews_xpcom",
@@ -2640,6 +2657,7 @@ dependencies = [
  "detect_win32k_conflicts",
  "dom",
  "dom_fragmentdirectives",
+ "dom_speculationrules",
  "encoding_glue",
  "etagere",
  "fluent 0.17.0",
@@ -2876,7 +2894,6 @@ dependencies = [
  "fxhash",
  "http 0.2.12",
  "log",
- "mailnews_ui_glue",
  "moz_http",
  "moz_task",
  "ms_graph_tb",
@@ -2885,7 +2902,6 @@ dependencies = [
  "oneshot",
  "operation-queue",
  "protocol_shared",
- "serde",
  "serde_json",
  "thin-vec",
  "thiserror 1.999.999",
@@ -2919,8 +2935,8 @@ dependencies = [
 
 [[package]]
 name = "happy-eyeballs"
-version = "0.6.0"
-source = "git+https://github.com/mozilla/happy-eyeballs?tag=v0.6.0#0807628db2bb90ced2c05e1f236473ee92719d22"
+version = "0.8.0"
+source = "git+https://github.com/mozilla/happy-eyeballs?tag=v0.8.0#d2788ca7dc997e4490f76e891a2fdcddea6b7ca8"
 dependencies = [
  "log",
  "thiserror 2.0.12",
@@ -3552,7 +3568,9 @@ dependencies = [
 [[package]]
 name = "jxl_simd"
 version = "0.4.3"
-source = "git+https://github.com/libjxl/jxl-rs?rev=c41cbfaf34c2c8ebc3fb6655c885fe427ab9542a#c41cbfaf34c2c8ebc3fb6655c885fe427ab9542a"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "jxl_transforms"
@@ -4352,7 +4370,6 @@ checksum = "2133b12230591b7e727c8977b96b791bba421cd80ce8eb08b782dcb4a43fa1e9"
 name = "moz_http"
 version = "0.1.0"
 dependencies = [
- "cstr",
  "http 0.2.12",
  "mozilla-central-workspace-hack",
  "nserror",
@@ -4437,7 +4454,7 @@ dependencies = [
 [[package]]
 name = "mp4parse"
 version = "0.17.0"
-source = "git+https://github.com/mozilla/mp4parse-rust?rev=fb7ed9effb5eae0f3768c2c5ec0a63c61f35ba60#fb7ed9effb5eae0f3768c2c5ec0a63c61f35ba60"
+source = "git+https://github.com/mozilla/mp4parse-rust?rev=b693c7e4a91d1d5a391c0404d18b6fc94714894e#b693c7e4a91d1d5a391c0404d18b6fc94714894e"
 dependencies = [
  "bitreader",
  "byteorder",
@@ -4454,7 +4471,7 @@ version = "0.1.0"
 [[package]]
 name = "mp4parse_capi"
 version = "0.17.0"
-source = "git+https://github.com/mozilla/mp4parse-rust?rev=fb7ed9effb5eae0f3768c2c5ec0a63c61f35ba60#fb7ed9effb5eae0f3768c2c5ec0a63c61f35ba60"
+source = "git+https://github.com/mozilla/mp4parse-rust?rev=b693c7e4a91d1d5a391c0404d18b6fc94714894e#b693c7e4a91d1d5a391c0404d18b6fc94714894e"
 dependencies = [
  "byteorder",
  "fallible_collections",
@@ -4470,7 +4487,6 @@ dependencies = [
  "form_urlencoded",
  "http 0.2.12",
  "serde",
- "serde_bytes",
  "serde_json",
  "strum",
  "thiserror 2.0.12",
@@ -4496,7 +4512,7 @@ checksum = "a2983372caf4480544083767bf2d27defafe32af49ab4df3a0b7fc90793a3664"
 [[package]]
 name = "naga"
 version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3#6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -4505,10 +4521,11 @@ dependencies = [
  "cfg_aliases",
  "codespan-reporting",
  "half",
- "hashbrown 0.16.999",
+ "hashbrown 0.17.1",
  "indexmap",
  "libm",
  "log",
+ "naga-types",
  "num-traits",
  "once_cell",
  "rustc-hash 1.999.999",
@@ -4516,6 +4533,18 @@ dependencies = [
  "spirv",
  "thiserror 2.0.12",
  "unicode-ident",
+]
+
+[[package]]
+name = "naga-types"
+version = "29.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+dependencies = [
+ "hashbrown 0.17.1",
+ "indexmap",
+ "rustc-hash 1.999.999",
+ "serde",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -4939,7 +4968,7 @@ dependencies = [
 [[package]]
 name = "ohttp"
 version = "0.7.2"
-source = "git+https://github.com/martinthomson/ohttp#600931b5a1e947776cbaad931ed78f1e89005352"
+source = "git+https://github.com/martinthomson/ohttp?rev=600931b5a1e947776cbaad931ed78f1e89005352#600931b5a1e947776cbaad931ed78f1e89005352"
 dependencies = [
  "bindgen 0.72.0",
  "byteorder",
@@ -5415,7 +5444,6 @@ version = "0.1.0"
 dependencies = [
  "async-lock",
  "base64 0.21.999",
- "cstr",
  "fxhash",
  "http 0.2.12",
  "log",
@@ -6238,9 +6266,9 @@ checksum = "75ce4f9dc4a41b4c3476cc925f1efb11b66df373a8fde5d4b8915fa91b5d995e"
 
 [[package]]
 name = "smallvec"
-version = "1.15.1"
+version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 dependencies = [
  "serde",
 ]
@@ -6572,7 +6600,6 @@ dependencies = [
 name = "sys_tray"
 version = "0.1.0"
 dependencies = [
- "cstr",
  "fluent 0.16.1",
  "fluent-ffi",
  "ksni",
@@ -6653,6 +6680,9 @@ name = "thin-vec"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "259cdf8ed4e4aca6f1e9d011e10bd53f524a2d0637d7b28450f6c64ac298c4c6"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "thiserror"
@@ -7452,7 +7482,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3#6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -7461,11 +7491,12 @@ dependencies = [
  "bytemuck",
  "cfg_aliases",
  "document-features",
- "hashbrown 0.16.999",
+ "hashbrown 0.17.1",
  "indexmap",
  "log",
  "macro_rules_attribute",
  "naga",
+ "naga-types",
  "once_cell",
  "parking_lot",
  "profiling",
@@ -7485,7 +7516,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-apple"
 version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3#6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
 dependencies = [
  "wgpu-hal",
 ]
@@ -7493,7 +7524,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-windows-linux-android"
 version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3#6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
 dependencies = [
  "wgpu-hal",
 ]
@@ -7501,7 +7532,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3#6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -7513,11 +7544,12 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "gpu-allocator",
- "hashbrown 0.16.999",
+ "hashbrown 0.17.1",
  "libc",
  "libloading",
  "log",
  "naga",
+ "naga-types",
  "objc2",
  "objc2-core-foundation",
  "objc2-foundation",
@@ -7542,7 +7574,7 @@ dependencies = [
 [[package]]
 name = "wgpu-naga-bridge"
 version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3#6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
 dependencies = [
  "naga",
  "wgpu-types",
@@ -7551,12 +7583,13 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3#6e8d0bd149fc6de7799755a4b9ee1ecd5fa63cb3"
+source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
 dependencies = [
  "bitflags 2.10.0",
  "bytemuck",
  "js-sys",
  "log",
+ "naga-types",
  "raw-window-handle",
  "serde",
  "static_assertions",
@@ -7923,7 +7956,6 @@ dependencies = [
 name = "xpcom_async_glue"
 version = "0.1.0"
 dependencies = [
- "cstr",
  "mozilla-central-workspace-hack",
  "nserror",
  "thin-vec",

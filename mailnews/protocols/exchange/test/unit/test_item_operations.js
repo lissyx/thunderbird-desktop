@@ -706,22 +706,38 @@ add_task(async function test_copy_folder_graph() {
   await runCopyFolderTest(graphServer, graphIncomingServer);
 });
 
-add_task(async function test_mark_as_junk() {
-  const rootFolder = ewsIncomingServer.rootFolder;
-  await syncFolder(ewsIncomingServer, rootFolder);
+add_task(async function test_mark_as_junk_ews() {
+  await runMarkAsJunkTest(ewsServer, ewsIncomingServer);
+});
+
+add_task(async function test_mark_as_junk_graph() {
+  await runMarkAsJunkTest(graphServer, graphIncomingServer);
+});
+
+/**
+ * Tests mark as junk/unjunk for both EWS and Graph protocols.
+ *
+ * @param {MockServer} mockServer - The `MockServer` child class instance to use
+ *   for creating folders and messages.
+ * @param {nsIMsgIncomingServer} incomingServer - The incoming message server for
+ *   the protocol being tested.
+ */
+async function runMarkAsJunkTest(mockServer, incomingServer) {
+  const rootFolder = incomingServer.rootFolder;
+  await syncFolder(incomingServer, rootFolder);
 
   // Add messages to the test folder.
   const junkMessages = generator.makeMessages({ count: 2 });
-  ewsServer.addItemToFolder("junk_message_1", "inbox", junkMessages[0]);
-  ewsServer.addItemToFolder("junk_message_2", "inbox", junkMessages[1]);
+  mockServer.addItemToFolder("junk_message_1", "inbox", junkMessages[0]);
+  mockServer.addItemToFolder("junk_message_2", "inbox", junkMessages[1]);
 
   const inboxFolder = rootFolder.getChildNamed("Inbox");
   Assert.ok(!!inboxFolder, `Inbox folder should exist`);
   const junkFolder = rootFolder.getChildNamed("Junk");
   Assert.ok(!!junkFolder, "Junk folder should exist");
 
-  await syncFolder(ewsIncomingServer, inboxFolder);
-  await syncFolder(ewsIncomingServer, junkFolder);
+  await syncFolder(incomingServer, inboxFolder);
+  await syncFolder(incomingServer, junkFolder);
 
   Assert.equal(
     inboxFolder.getTotalMessages(false),
@@ -783,7 +799,7 @@ add_task(async function test_mark_as_junk() {
     unjunkListener
   );
   await unjunkListener.promise;
-  await syncFolder(ewsIncomingServer, inboxFolder);
+  await syncFolder(incomingServer, inboxFolder);
 
   Assert.equal(
     [...inboxFolder.messages].length,
@@ -795,49 +811,57 @@ add_task(async function test_mark_as_junk() {
     1,
     "Should still be one junked message in junk folder."
   );
-});
+}
 
-add_task(async function test_change_flag_status() {
-  const folderName = "change_flag_status";
-  ewsServer.appendRemoteFolder(
+async function runChangeFlagStatusTest(mockServer, incomingServer) {
+  const folderName = `change_flag_status_${incomingServer.type}`;
+  mockServer.appendRemoteFolder(
     new RemoteFolder(folderName, "root", folderName, folderName)
   );
 
-  const rootFolder = ewsIncomingServer.rootFolder;
-  await syncFolder(ewsIncomingServer, rootFolder);
+  const rootFolder = incomingServer.rootFolder;
+  await syncFolder(incomingServer, rootFolder);
 
   const folder = rootFolder.getChildNamed(folderName);
   Assert.ok(!!folder, `${folderName} folder should exist.`);
 
   // Add messages to the folder.
   const message = generator.makeMessages({ count: 1 })[0];
-  ewsServer.addItemToFolder("message", folderName, message);
+  mockServer.addItemToFolder("message", folderName, message);
 
-  await syncFolder(ewsIncomingServer, folder);
+  await syncFolder(incomingServer, folder);
 
   // Get the message header.
   const messageHeaders = [...folder.messages];
   Assert.equal(messageHeaders.length, 1, "Should have one message to flag.");
   const messageHeader = messageHeaders[0];
 
-  const serverItem = ewsServer.getItemInfo("message");
+  const serverItem = mockServer.getItemInfo("message");
   Assert.ok(!!serverItem, "Message should exist on server.");
   const serverMessage = serverItem.syntheticMessage;
   Assert.ok(!!serverMessage, "Synthetic message should exist.");
 
   // Flag the message.
   folder.markMessagesFlagged([messageHeader], true);
-  TestUtils.waitForCondition(
+  await TestUtils.waitForCondition(
     () => serverMessage.metaState.flagged,
     "Waiting for message to be flagged."
   );
 
   // Unflag the message.
   folder.markMessagesFlagged([messageHeader], false);
-  TestUtils.waitForCondition(
+  await TestUtils.waitForCondition(
     () => !serverMessage.metaState.flagged,
     "Waiting for message to be unflagged."
   );
+}
+
+add_task(async function test_flag_item_ews() {
+  await runChangeFlagStatusTest(ewsServer, ewsIncomingServer);
+});
+
+add_task(async function test_flag_item_graph() {
+  await runChangeFlagStatusTest(graphServer, graphIncomingServer);
 });
 
 async function runHardDeleteTest(mockServer, incomingServer) {

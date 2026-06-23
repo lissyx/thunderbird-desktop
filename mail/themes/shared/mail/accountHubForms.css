@@ -444,6 +444,13 @@ div:has(legend) {
     stroke: currentColor;
   }
 
+  &.error a,
+  &.success a,
+  &.warning a,
+  &.info a {
+    color: inherit;
+  }
+
   &.error {
     background-color: var(--color-critical-soft);
     color: light-dark(var(--color-critical-pressed-light), var(--color-text-base-dark));
@@ -625,6 +632,11 @@ div:has(legend) {
     &.single {
       gap: var(--hub-config-confirm-space-medium);
     }
+
+    &.is-showing-shared-config .shared-config-item,
+    &:not(.is-showing-shared-config) .config-common {
+      display: none;
+    }
   }
 
   & .selection-grid {
@@ -728,8 +740,6 @@ div:has(legend) {
       gap: 2px;
 
       & p {
-        overflow: hidden;
-        text-overflow: ellipsis;
         line-height: normal;
         margin: 0;
 
@@ -746,6 +756,9 @@ div:has(legend) {
           color: var(--color-text-base);
           font-weight: 400;
           font-size: 1rem;
+          text-wrap: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
       }
 

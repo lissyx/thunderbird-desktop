@@ -19,7 +19,7 @@ const ONE_MONTH_IN_MILLISECONDS = 31 * 24 * 60 * 60 * 1000;
  *
  * @type {Intl.Collator}
  */
-const folderNameCollator = new Intl.Collator();
+const folderNameCollator = new Intl.Collator(undefined, { numeric: true });
 
 export var FolderUtils = {
   allAccountsSorted,
@@ -305,7 +305,7 @@ function getFolderIcon(folder) {
 function isSmartVirtualFolder(folder) {
   return (
     folder.isSpecialFolder(Ci.nsMsgFolderFlags.Virtual) &&
-    folder.server.hostName == "smart mailboxes" &&
+    folder.server.hostname == "smart mailboxes" &&
     folder.parent?.isServer
   );
 }
@@ -319,7 +319,7 @@ function isSmartVirtualFolder(folder) {
 function isSmartTagsFolder(folder) {
   return (
     folder.isSpecialFolder(Ci.nsMsgFolderFlags.Virtual) &&
-    folder.server.hostName == "smart mailboxes" &&
+    folder.server.hostname == "smart mailboxes" &&
     folder.parent?.name == "tags"
   );
 }

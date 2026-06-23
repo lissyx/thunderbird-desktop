@@ -13,13 +13,12 @@
 #include "nsIComponentRegistrar.h"
 #include "nsXULAppAPI.h"
 
-#include "../../local/src/nsPop3URL.h"
 #include "../../local/src/nsMailboxService.h"
-#include "../../compose/src/nsSmtpUrl.h"
+#include "../src/nsMsgMailNewsUrl.h"
 #include "../../addrbook/src/nsLDAPURL.h"
 #include "../../imap/src/nsImapService.h"
-#include "../../news/src/nsNntpUrl.h"
 #include "../src/nsCidProtocolHandler.h"
+#include "nsMsgUtils.h"
 
 // Instantiates a new `nsIURI` of the appropriate concrete type for the provided
 // URI spec.
@@ -79,28 +78,33 @@ nsresult NS_NewMailnewsURI(nsIURI** aURI, const nsACString& aSpec,
     return rv;
   }
   if (scheme.EqualsLiteral("smtp") || scheme.EqualsLiteral("smtps")) {
-    return nsSmtpUrl::NewSmtpURI(aSpec, aBaseURI, aURI);
+    return NS_MutateURI(new nsMsgMailNewsUrl::Mutator())
+        .SetSpec(aSpec)
+        .Finalize(aURI);
   }
   if (scheme.EqualsLiteral("mailto")) {
-    if (NS_IsMainThread()) {
-      return nsMailtoUrl::NewMailtoURI(aSpec, aBaseURI, aURI);
-    }
-    // If we're for some reason not on the main thread, dispatch to main
-    // or else we'll crash.
-    auto NewURI = [&aSpec, &aBaseURI, aURI, &rv]() -> auto {
-      rv = nsMailtoUrl::NewMailtoURI(aSpec, aBaseURI, aURI);
-    };
-    nsCOMPtr<nsIRunnable> task = NS_NewRunnableFunction("NewURI", NewURI);
-    mozilla::SyncRunnable::DispatchToThread(
-        mozilla::GetMainThreadSerialEventTarget(), task);
-    return rv;
+    return NS_MutateURI(new mozilla::net::nsSimpleURI::Mutator())
+        .SetSpec(aSpec)
+        .Finalize(aURI);
   }
   if (scheme.EqualsLiteral("pop") || scheme.EqualsLiteral("pop3")) {
-    return nsPop3URL::NewURI(aSpec, aBaseURI, aURI);
+    return nsMailboxService::CreatePop3URI(aSpec, aBaseURI, aURI);
   }
-  if (scheme.EqualsLiteral("news") || scheme.EqualsLiteral("snews") ||
-      scheme.EqualsLiteral("news-message") || scheme.EqualsLiteral("nntp")) {
-    return nsNntpUrl::NewURI(aSpec, aBaseURI, aURI);
+  if (IsNewsScheme(scheme)) {
+    nsCOMPtr<nsIMsgMailNewsUrl> uri =
+        do_CreateInstance("@mozilla.org/messenger/msgmailnewsurl;1", &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+    if (aBaseURI) {
+      nsAutoCString newSpec;
+      rv = aBaseURI->Resolve(aSpec, newSpec);
+      NS_ENSURE_SUCCESS(rv, rv);
+      rv = uri->SetSpecInternal(newSpec);
+    } else {
+      rv = uri->SetSpecInternal(aSpec);
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
+    uri.forget(aURI);
+    return NS_OK;
   }
   if (scheme.EqualsLiteral("cid")) {
     return nsCidProtocolHandler::NewURI(aSpec, aCharset, aBaseURI, aURI);
@@ -143,6 +147,7 @@ nsresult NS_NewMailnewsURI(nsIURI** aURI, const nsACString& aSpec,
     rv = NS_MutateURI(new mozilla::net::nsStandardURL::Mutator())
              .SetSpec(aSpec)
              .Finalize(uriResult);
+    NS_ENSURE_SUCCESS(rv, rv);
 
     nsAutoCString query;
     rv = uriResult->GetQuery(query);

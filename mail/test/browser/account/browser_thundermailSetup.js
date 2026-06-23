@@ -73,7 +73,7 @@ add_task(async function () {
   const footer = dialog.querySelector("#emailFooter");
   const footerForward = footer.querySelector("#forward");
 
-  await BrowserTestUtils.waitForCondition(
+  await TestUtils.waitForCondition(
     () => BrowserTestUtils.isVisible(button),
     "waiting for Thundermail button to be visible"
   );
@@ -126,7 +126,7 @@ add_task(async function () {
   );
   const imapServer = account.incomingServer;
   Assert.equal(imapServer.type, "imap");
-  Assert.equal(imapServer.hostName, "external.test");
+  Assert.equal(imapServer.hostname, "external.test");
   Assert.equal(imapServer.port, 143);
   Assert.equal(imapServer.authMethod, Ci.nsMsgAuthMethod.OAuth2);
   Assert.equal(imapServer.username, username);

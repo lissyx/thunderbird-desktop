@@ -4,12 +4,10 @@
 
 use std::{
     cell::Cell,
-    future::Future,
     task::{Poll, Waker},
     time::Duration,
 };
 
-use cstr::cstr;
 use nserror::{NS_ERROR_INVALID_ARG, NS_ERROR_UNEXPECTED, NS_OK, nsresult};
 use xpcom::{RefPtr, interfaces::nsITimer, xpcom_method};
 
@@ -47,7 +45,7 @@ struct SleepTimer {
 impl SleepTimer {
     /// Creates a new sleep timer with the specified duration.
     fn with_duration(duration: Duration) -> Result<RefPtr<Self>, nsresult> {
-        let timer = xpcom::create_instance::<nsITimer>(cstr!("@mozilla.org/timer;1"))
+        let timer = xpcom::create_instance::<nsITimer>(c"@mozilla.org/timer;1")
             .ok_or(NS_ERROR_UNEXPECTED)?;
 
         let sleeper = Self::allocate(InitSleepTimer {
@@ -88,10 +86,7 @@ impl SleepTimer {
 impl Future for SleepTimerFuture {
     type Output = ();
 
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if self.0.has_timer_completed.take() {
             Poll::Ready(())
         } else {

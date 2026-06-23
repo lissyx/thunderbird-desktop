@@ -102,7 +102,7 @@ function onInit(aPageId, aServerId) {
   }
   // OAuth2 is only supported on certain servers.
   const details = OAuth2Providers.getHostnameDetails(
-    document.getElementById("server.hostName").value,
+    document.getElementById("server.hostname").value,
     serverType
   );
   document.getElementById("authMethod-oauth2").hidden = !details;
@@ -258,7 +258,7 @@ function onAdvanced() {
     serverSettings.deferredToAccount = document
       .getElementById("pop3.deferredToAccount")
       .getAttribute("value");
-  } else if (serverType == "ews") {
+  } else if (serverType == "ews" || serverType == "graph") {
     serverSettings.exchangeUrl = document
       .getElementById("ews.exchangeUrl")
       .getAttribute("value");
@@ -410,7 +410,7 @@ function onAdvanced() {
           );
         }
       }
-    } else if (serverType == "ews") {
+    } else if (serverType == "ews" || serverType == "graph") {
       document
         .getElementById("ews.exchangeUrl")
         .setAttribute("value", serverSettings.exchangeUrl);
@@ -486,7 +486,7 @@ function secureSelect(aLoading) {
     certCheck.hidden = true;
   } else {
     certCheck.init(
-      document.getElementById("server.hostName").value,
+      document.getElementById("server.hostname").value,
       document.getElementById("server.port").value,
       document.getElementById("server.type").value,
       document.getElementById("server.socketType").value ==

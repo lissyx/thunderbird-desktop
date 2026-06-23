@@ -5,7 +5,6 @@
 #ifndef COMM_MAILNEWS_BASE_SRC_NSMSGMAILNEWSURL_H_
 #define COMM_MAILNEWS_BASE_SRC_NSMSGMAILNEWSURL_H_
 
-#include "msgCore.h"
 #include "nsCOMPtr.h"
 #include "nscore.h"
 #include "nsICacheEntry.h"
@@ -23,8 +22,8 @@
 #include "nsIURL.h"
 #include "nsIUrlListener.h"
 #include "nsIWeakReferenceUtils.h"
-#include "nsString.h"
 #include "nsTObserverArray.h"
+#include "URIHasher.h"
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Okay, I found that all of the mail and news url interfaces needed to support
@@ -39,7 +38,8 @@ class nsMsgMailNewsUrl : public nsIMsgMailNewsUrl,
                          public nsISerializable,
                          public nsIIPCSerializableURI,
                          public nsIURIWithSizeOf,
-                         public nsIClassInfo {
+                         public nsIClassInfo,
+                         public mozilla::net::URIHasher {
  public:
   nsMsgMailNewsUrl();
 

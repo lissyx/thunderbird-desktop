@@ -3,6 +3,8 @@ head = "head.js"
 support-files = ["data/*"]
 prefs = ["mail.graph.enabled=true"]
 
+["test_autosync.js"]
+
 ["test_client.js"]
 
 ["test_delete_model_trash_path.js"]
@@ -33,6 +35,8 @@ tags = ["foldernames"]
 ["test_item_operations.js"]
 
 ["test_item_operations_exchange_2010.js"]
+
+["test_lockedFlagsExchange.js"]
 
 ["test_saveDraft.js"]
 

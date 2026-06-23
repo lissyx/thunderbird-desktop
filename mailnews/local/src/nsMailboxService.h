@@ -11,7 +11,7 @@
 #include "nsIMsgFolder.h"
 #include "nsIMsgMessageService.h"
 #include "nsIMsgWindow.h"
-#include "nsIMailboxUrl.h"
+#include "nsMailboxUrl.h"
 #include "nsIURI.h"
 #include "nsIUrlListener.h"
 #include "nsIProtocolHandler.h"
@@ -24,6 +24,14 @@ class nsMailboxService : public nsIMsgMessageService,
   static nsresult NewURI(const nsACString& aSpec, const char* aOriginCharset,
                          nsIURI* aBaseURI, nsIURI** _retval);
 
+  /**
+   * Create a pop3:// URI from a spec containing a ?uidl= query parameter.
+   * Encodes folder URI and message key so Pop3Channel can find the folder
+   * and reconstruct the original message URI.
+   */
+  static nsresult CreatePop3URI(const nsACString& aSpec, nsIURI* aBaseURI,
+                                nsIURI** _retval);
+
   NS_DECL_ISUPPORTS
   NS_DECL_NSIMSGMESSAGESERVICE
   NS_DECL_NSIMSGMESSAGEFETCHPARTSERVICE
@@ -35,8 +43,8 @@ class nsMailboxService : public nsIMsgMessageService,
   // helper functions used by the service
   nsresult PrepareMessageUrl(const nsACString& aSrcMsgMailboxURI,
                              nsIUrlListener* aUrlListener,
-                             nsMailboxAction aMailboxAction,
-                             nsIMailboxUrl** aMailboxUrl,
+                             MailboxAction aMailboxAction,
+                             nsIMsgMailNewsUrl** aMailboxUrl,
                              nsIMsgWindow* msgWindow);
 
   nsresult RunMailboxUrl(nsIURI* aMailboxUrl,
@@ -46,7 +54,7 @@ class nsMailboxService : public nsIMsgMessageService,
       const nsACString& aMessageURI, nsISupports* aDisplayConsumer,
       nsIMsgWindow* aMsgWindow, nsIUrlListener* aUrlListener,
       const char* aFileName, /* only used by open attachment */
-      nsMailboxAction mailboxAction, bool aAutodetectCharset, nsIURI** aURL);
+      MailboxAction mailboxAction, bool aAutodetectCharset, nsIURI** aURL);
 
   nsresult DecomposeMailboxURI(const nsACString& aMessageURI,
                                nsIMsgFolder** aFolder, nsMsgKey* aMsgKey);

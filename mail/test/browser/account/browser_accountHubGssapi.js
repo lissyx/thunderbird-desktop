@@ -24,7 +24,7 @@ add_setup(async function () {
 add_task(async function test_gssapi_account_skips_password_step() {
   await subtest_passwordless_account_skips_password_step({
     email: "john.doe@gssapi.test",
-    expectedAuthLabelId: "account-hub-result-auth-gssapi",
+    expectedAuthLabelId: "account-hub-result-authentication-gssapi",
     incomingAuthMethod: Ci.nsMsgAuthMethod.GSSAPI,
     outgoingAuthMethod: Ci.nsMsgAuthMethod.GSSAPI,
   });
@@ -33,9 +33,18 @@ add_task(async function test_gssapi_account_skips_password_step() {
 add_task(async function test_mixed_passwordless_account_skips_password_step() {
   await subtest_passwordless_account_skips_password_step({
     email: "john.doe@mixed-passwordless.test",
-    expectedAuthLabelId: "account-hub-result-auth-oauth2",
+    expectedAuthLabelId: "account-hub-result-authentication-oauth2",
     incomingAuthMethod: Ci.nsMsgAuthMethod.OAuth2,
     outgoingAuthMethod: Ci.nsMsgAuthMethod.GSSAPI,
+  });
+});
+
+add_task(async function test_no_auth_account_skips_password_step() {
+  await subtest_passwordless_account_skips_password_step({
+    email: "john.doe@oauth-no-auth.test",
+    expectedAuthLabelId: "account-hub-result-authentication-oauth2",
+    incomingAuthMethod: Ci.nsMsgAuthMethod.OAuth2,
+    outgoingAuthMethod: Ci.nsMsgAuthMethod.none,
   });
 });
 
@@ -70,7 +79,7 @@ async function subtest_passwordless_account_skips_password_step({
 
   Assert.equal(
     configFoundTemplate.l10n.getAttributes(
-      configFoundTemplate.querySelector("#authenticationType")
+      configFoundTemplate.querySelector("#incomingAuthenticationType")
     ).id,
     expectedAuthLabelId,
     "Should show expected authentication type on IMAP config."

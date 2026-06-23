@@ -20,6 +20,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ConfigVerifier: "resource:///modules/accountcreation/ConfigVerifier.sys.mjs",
   CreateInBackend:
     "resource:///modules/accountcreation/CreateInBackend.sys.mjs",
+  enforcePrimaryPassword: "resource:///modules/PrimaryPassword.sys.mjs",
   FetchConfig: "resource:///modules/accountcreation/FetchConfig.sys.mjs",
   FindConfig: "resource:///modules/accountcreation/FindConfig.sys.mjs",
   getAddonsList:
@@ -30,6 +31,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   OAuth2Providers: "resource:///modules/OAuth2Providers.sys.mjs",
   RemoteAddressBookUtils:
     "resource:///modules/accountcreation/RemoteAddressBookUtils.sys.mjs",
+  openLinkExternally: "resource:///modules/LinkHelper.sys.mjs",
 });
 
 import "chrome://messenger/content/accountcreation/content/widgets/account-hub-step.mjs"; // eslint-disable-line import/no-unassigned-import
@@ -1082,7 +1084,9 @@ class AccountHubEmail extends HTMLElement {
         break;
       case "incomingConfigSubview":
         if (stateData.config.isExchangeConfig()) {
-          await this.#validateAccountConfig(stateData.config);
+          if (!(await this.#validateAccountConfig(stateData.config))) {
+            break;
+          }
 
           // If we are not in the password subview, that means the account
           // has been created and we can fetch the sync accounts.
@@ -1108,7 +1112,9 @@ class AccountHubEmail extends HTMLElement {
         break;
       case "emailConfigFoundSubview":
       case "outgoingConfigSubview":
-        await this.#validateAccountConfig(stateData);
+        if (!(await this.#validateAccountConfig(stateData))) {
+          break;
+        }
 
         // If we are not in the password subview, that means the account
         // has been created and we can fetch the sync accounts.
@@ -1125,7 +1131,10 @@ class AccountHubEmail extends HTMLElement {
         );
         this.#currentConfig.rememberPassword = stateData.rememberPassword;
 
-        await this.#createAccount("account-hub-creating-account");
+        if (!(await this.#createAccount("account-hub-creating-account"))) {
+          // Didn't complete account creation.
+          break;
+        }
         await this.#fetchSyncAccounts();
 
         break;
@@ -1485,25 +1494,28 @@ class AccountHubEmail extends HTMLElement {
    * Finalize the account config, validate it and start authentication.
    *
    * @param {AccountConfig} accountConfig
+   * @returns {boolean} If an account was successfully created. This is always
+   *   true if prompting for a password.
    */
   async #validateAccountConfig(accountConfig) {
     this.#currentConfig = this.#fillAccountConfig(accountConfig);
 
     if (this.#currentConfig.usesPasswordlessAuthentication()) {
-      await this.#createAccount(
+      return this.#createAccount(
         this.#currentConfig.incoming.auth === Ci.nsMsgAuthMethod.OAuth2 ||
           this.#currentConfig.outgoing.auth === Ci.nsMsgAuthMethod.OAuth2
           ? "account-hub-oauth-pending"
           : "account-hub-creating-account"
       );
-      return;
     }
 
     let creationError;
     if (this.#currentConfig.incoming.password) {
       try {
-        await this.#createAccount("account-hub-creating-account");
-        return;
+        const result = await this.#createAccount(
+          "account-hub-creating-account"
+        );
+        return result;
       } catch (error) {
         // Show error in password view.
         creationError = error;
@@ -1531,30 +1543,37 @@ class AccountHubEmail extends HTMLElement {
         type: "info",
       });
     }
+    return true;
   }
 
   /**
    * Create account and advance to sync accounts step if successful.
    *
    * @param {string} loadReason - Fluent string ID with the load reason.
+   * @returns {boolean} True when an account was created, false when creation
+   *   was aborted. Other cases where no account was created will throw.
    */
   async #createAccount(loadReason) {
+    this.abortable = new AbortController();
     this.#startLoading(loadReason);
     gAccountSetupLogger.debug("Create button clicked.");
     try {
-      // We don't want the user to be able to cancel account creation here,
-      // as the back button is available in this step. The next state doesn't
-      // have a back button, so we don't need to reset it after.
-      this.#emailFooter.canBack(false);
       await this.#validateAndFinish(this.#currentConfig.copy());
     } catch (error) {
-      // Show the back button again if account creation failed.
-      this.#emailFooter.canBack(true);
+      if (
+        error instanceof UserCancelledException ||
+        error instanceof UserSkippedError
+      ) {
+        return false;
+      }
       throw error;
     } finally {
       this.#configVerifier?.cleanup();
+      this.#configVerifier = null;
+      this.abortable = null;
       this.#stopLoading();
     }
+    return true;
   }
 
   /**
@@ -1746,14 +1765,26 @@ class AccountHubEmail extends HTMLElement {
         ? this.#currentConfig.subSource
         : this.#currentConfig.source;
 
-    // This verifies the the current config and, if needed, opens up an
-    // additional window for authentication.
-    this.#configVerifier = new lazy.ConfigVerifier(window.msgWindow);
+    // This verifies the current config and, if needed, opens up an additional
+    // window for authentication.
+    this.#configVerifier = new lazy.ConfigVerifier(
+      window.msgWindow,
+      this.abortable.signal
+    );
+    this.abortable.signal.addEventListener(
+      "abort",
+      () => {
+        this.#configVerifier?.cleanup();
+        this.#configVerifier = null;
+      },
+      { once: true }
+    );
     try {
       const successfulConfig = await this.#configVerifier.verifyConfig(
         completeConfig,
         completeConfig.source != lazy.AccountConfig.kSourceXML
       );
+      this.abortable?.signal.throwIfAborted();
       // The auth might have changed, so we should update the current config.
       completeConfig.incoming.auth = successfulConfig.incoming.auth;
       completeConfig.outgoing.auth = successfulConfig.outgoing.auth;
@@ -1764,6 +1795,14 @@ class AccountHubEmail extends HTMLElement {
       this.#finishEmailAccountAddition(completeConfig);
       Glean.mail.successfulEmailAccountSetup[telemetryKey].add(1);
     } catch (error) {
+      if (
+        error instanceof UserCancelledException ||
+        error instanceof UserSkippedError
+      ) {
+        this.#configVerifier?.cleanup();
+        this.#configVerifier = null;
+        throw error;
+      }
       // If we get no message, then something other than VerifyLogon failed.
       let errorTitle = "account-hub-account-authentication-error";
       // For an Exchange server, some known configurations can
@@ -1776,7 +1815,8 @@ class AccountHubEmail extends HTMLElement {
         errorTitle = "account-hub-exchange-config-unverifiable";
       }
 
-      this.#configVerifier.cleanup();
+      this.#configVerifier?.cleanup();
+      this.#configVerifier = null;
       Glean.mail.failedEmailAccountSetup[telemetryKey].add(1);
 
       throw new Error(error.message, {
@@ -1795,16 +1835,26 @@ class AccountHubEmail extends HTMLElement {
    * @param {AccountConfig} completeConfig - The completed config
    */
   async #finishEmailAccountAddition(completeConfig) {
-    gAccountSetupLogger.debug("Creating account in backend.");
-    const emailAccount =
-      await lazy.CreateInBackend.createAccountInBackend(completeConfig);
-    emailAccount.incomingServer.getNewMessages(
-      emailAccount.incomingServer.rootFolder,
-      window.msgWindow,
-      null
-    );
+    // We don't want the user to be able to cancel account creation here,
+    // as the back button is available in this step. The next state doesn't
+    // have a back button, so we don't need to reset it after.
+    this.#emailFooter.canBack(false);
+    this.abortable = null;
+    try {
+      gAccountSetupLogger.debug("Creating account in backend.");
+      const emailAccount =
+        await lazy.CreateInBackend.createAccountInBackend(completeConfig);
+      emailAccount.incomingServer.getNewMessages(
+        emailAccount.incomingServer.rootFolder,
+        window.msgWindow,
+        null
+      );
 
-    this.#account = emailAccount;
+      this.#account = emailAccount;
+    } catch (error) {
+      this.#emailFooter.canBack(true);
+      throw error;
+    }
   }
 
   /**
@@ -1996,31 +2046,78 @@ class AccountHubEmail extends HTMLElement {
     await this.reset();
   }
 
-  #showConfigFoundNotification() {
-    let configFoundString = "account-hub-config-success-unknown";
+  #getConfigFoundNotificationCustomDescription() {
+    let configFoundDescriptionStringId;
 
     const CONFIG_SOURCE = {
       [lazy.AccountConfig.kSourceExchange]:
-        "account-hub-config-success-exchange",
-      [lazy.AccountConfig.kSourceGuess]: "account-hub-config-success-guess",
+        "account-hub-config-success-description-exchange",
+      [lazy.AccountConfig.kSourceGuess]:
+        "account-hub-config-success-description-guess",
     };
 
     if (Object.hasOwn(CONFIG_SOURCE, this.#currentConfig.source)) {
-      configFoundString = CONFIG_SOURCE[this.#currentConfig.source];
+      configFoundDescriptionStringId =
+        CONFIG_SOURCE[this.#currentConfig.source];
     } else if (this.#currentConfig.source == lazy.AccountConfig.kSourceXML) {
       const CONFIG_SUBSOURCE = {
-        "xml-from-disk": "account-hub-config-success-disk",
-        "xml-from-isp-https": "account-hub-config-success-isp",
-        "xml-from-isp-http": "account-hub-config-success-isp",
-        "xml-from-db": "account-hub-config-success",
+        "xml-from-disk": "account-hub-config-success-description-disk",
+        "xml-from-isp-https": "account-hub-config-success-description-isp",
+        "xml-from-isp-http": "account-hub-config-success-description-isp",
+        "xml-from-db": "account-hub-config-success-description-db",
       };
       if (Object.hasOwn(CONFIG_SUBSOURCE, this.#currentConfig.subSource)) {
-        configFoundString = CONFIG_SUBSOURCE[this.#currentConfig.subSource];
+        configFoundDescriptionStringId =
+          CONFIG_SUBSOURCE[this.#currentConfig.subSource];
       }
     }
 
+    return configFoundDescriptionStringId;
+  }
+
+  #showConfigFoundNotification() {
+    const configFoundDescriptionId =
+      this.#getConfigFoundNotificationCustomDescription();
+
+    const description = document.createDocumentFragment();
+
+    const configDescription = document.createElement("span");
+    document.l10n.setAttributes(configDescription, configFoundDescriptionId);
+
+    const readMore = document.createElement("span");
+    document.l10n.setAttributes(
+      readMore,
+      "account-hub-config-success-description-read-more"
+    );
+
+    const link = document.createElement("a");
+    link.href =
+      "https://support.thunderbird.net/kb/automatic-account-configuration";
+    link.dataset.l10nName = "automated-setup-link";
+
+    // Fluent does a shallow clone of the <a> element, which doesn't copy
+    // over event handlers. Instead, add a click handler to the parent element
+    // so that the external link is opened correctly.
+    readMore.addEventListener("click", event => {
+      const eventLink = event.target.closest(
+        'a[data-l10n-name="automated-setup-link"]'
+      );
+      if (!eventLink) {
+        return;
+      }
+      event.preventDefault();
+      lazy.openLinkExternally(eventLink.href, {
+        addToHistory: false,
+      });
+    });
+
+    readMore.appendChild(link);
+
+    description.append(configDescription, " ", readMore);
+
     this.#currentSubview.showNotification({
-      fluentTitleId: configFoundString,
+      fluentTitleId: "account-hub-config-success-title",
+      description,
       type: "success",
     });
   }
@@ -2097,6 +2194,9 @@ class AccountHubEmail extends HTMLElement {
     }
 
     // Save token to logins store.
+    if (!lazy.enforcePrimaryPassword()) {
+      return;
+    }
     const login = Cc["@mozilla.org/login-manager/loginInfo;1"].createInstance(
       Ci.nsILoginInfo
     );

@@ -23,8 +23,6 @@
 #include "nsIDocShell.h"
 #include "nsIMsgWindow.h"
 #include "nsIWindowMediator.h"
-#include "nsIPrompt.h"
-#include "nsIInterfaceRequestorUtils.h"
 #include "nsIAbCard.h"
 #include "nsISpamSettings.h"
 #include "nsIMsgFilterPlugin.h"
@@ -88,6 +86,9 @@ static LazyLogModule gFolderLockLog("FolderLock");
 
 static PRTime gtimeOfLastPurgeCheck;  // variable to know when to check for
                                       // purge threshold
+
+// Guard to prevent re-entrant auto-compaction.
+static bool gAutoCompactInProgress;
 
 #define PREF_MAIL_PROMPT_PURGE_THRESHOLD "mail.prompt_purge_threshold"
 #define PREF_MAIL_PURGE_THRESHOLD_MB "mail.purge_threshold_mb"
@@ -1556,6 +1557,18 @@ class AutoCompactEvent : public mozilla::Runnable {
 
 nsresult nsMsgDBFolder::HandleAutoCompactEvent(nsIMsgWindow* aWindow) {
   MOZ_LOG(gCompactLog, LogLevel::Debug, ("Performing AutoCompactEvent check"));
+
+  // Prevent re-entrant auto-compaction. The compact dialog is modal and
+  // spins the event loop, which can allow the autosync timer or additional
+  // AutoCompactEvents to fire. Those nested operations may commit or modify
+  // the same Mork database, corrupting iterators (bug 554482).
+  if (gAutoCompactInProgress) {
+    MOZ_LOG(gCompactLog, LogLevel::Debug,
+            ("AutoCompactEvent already in progress, skipping"));
+    return NS_OK;
+  }
+  gAutoCompactInProgress = true;
+  auto guard = mozilla::MakeScopeExit([&] { gAutoCompactInProgress = false; });
 
   nsCOMPtr<nsIMsgAccountManager> accountMgr =
       mozilla::components::AccountManager::Service();
@@ -3996,6 +4009,10 @@ NS_IMETHODIMP nsMsgDBFolder::SetFlag(uint32_t flag) {
 }
 
 NS_IMETHODIMP nsMsgDBFolder::ClearFlag(uint32_t flag) {
+  if (flag & mLockedFlags) {
+    return NS_OK;
+  }
+
   // If calling this function causes us to open the db (i.e., it was not
   // open before), we're going to close the db before returning.
   bool dbWasOpen = mDatabase != nullptr;
@@ -4024,6 +4041,10 @@ NS_IMETHODIMP nsMsgDBFolder::GetFlag(uint32_t flag, bool* _retval) {
 }
 
 NS_IMETHODIMP nsMsgDBFolder::ToggleFlag(uint32_t flag) {
+  if (flag & mLockedFlags) {
+    return NS_OK;
+  }
+
   mFlags ^= flag;
   OnFlagChange(flag);
 
@@ -4056,6 +4077,8 @@ NS_IMETHODIMP nsMsgDBFolder::OnFlagChange(uint32_t flag) {
 }
 
 NS_IMETHODIMP nsMsgDBFolder::SetFlags(uint32_t aFlags) {
+  aFlags |= mLockedFlags;
+
   if (mFlags != aFlags) {
     uint32_t changedFlags = aFlags ^ mFlags;
     mFlags = aFlags;
@@ -4231,12 +4254,12 @@ NS_IMETHODIMP nsMsgDBFolder::GetUsername(nsACString& userName) {
   return server->GetUsername(userName);
 }
 
-NS_IMETHODIMP nsMsgDBFolder::GetHostname(nsACString& hostName) {
+NS_IMETHODIMP nsMsgDBFolder::GetHostname(nsACString& hostname) {
   nsresult rv;
   nsCOMPtr<nsIMsgIncomingServer> server;
   rv = GetServer(getter_AddRefs(server));
   NS_ENSURE_SUCCESS(rv, rv);
-  return server->GetHostName(hostName);
+  return server->GetHostname(hostname);
 }
 
 NS_IMETHODIMP nsMsgDBFolder::GetNewMessages(nsIMsgWindow*,

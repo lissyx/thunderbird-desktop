@@ -40,6 +40,8 @@ support-files = ["files/**"]
 
 ["browser_accountHubEmailManualIncomingForm.js"]
 
+["browser_accountHubEmailManualOutgoingForm.js"]
+
 ["browser_accountHubEmailPasswordForm.js"]
 
 ["browser_accountHubFooter.js"]
@@ -54,7 +56,10 @@ support-files = ["files/**"]
 
 ["browser_accountHubStep.js"]
 
+["browser_createInBackend.js"]
+
 ["browser_oAuthGranularScopes.js"]
 tags = ["oauth"]
 
 ["browser_verifyConfig.js"]
+tags = ["oauth"]

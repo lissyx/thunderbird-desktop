@@ -70,10 +70,8 @@ account-hub-email-continue-button = Continue
 account-hub-email-confirm-button = Confirm
 
 account-hub-result-incoming-legend = Incoming
-    .title = Incoming
 
 account-hub-result-outgoing-legend = Outgoing
-    .title = Outgoing
 
 account-hub-all-servers-legend = All servers
 
@@ -85,10 +83,8 @@ account-hub-result-hostname-label = Hostname
 account-hub-result-socket-type-label = Connection security
 
 account-hub-servers-username-label = Username:
-    .title = Username
 
 account-hub-result-server-label = Server:
-    .title = Server
 
 account-hub-result-port-label = Port:
 
@@ -96,19 +92,26 @@ account-hub-result-security-label = Security:
 
 account-hub-result-authentication-type-label = Authentication:
 
-account-hub-result-auth-none = None
+account-hub-result-authentication-none = None
+    .title = None
 
-account-hub-result-auth-password = Normal Password
+account-hub-result-authentication-password = Normal Password
+    .title = Normal Password
 
-account-hub-result-auth-encrypted-password = Encrypted Password
+account-hub-result-authentication-encrypted-password = Encrypted Password
+    .title = Encrypted Password
 
-account-hub-result-auth-gssapi = Kerberos
+account-hub-result-authentication-gssapi = Kerberos
+    .title = Kerberos
 
-account-hub-result-auth-ntlm = NTLM
+account-hub-result-authentication-ntlm = NTLM
+    .title = NTLM
 
-account-hub-result-auth-external = External
+account-hub-result-authentication-external = External
+    .title = External
 
-account-hub-result-auth-oauth2 = OAuth2
+account-hub-result-authentication-oauth2 = OAuth2
+    .title = OAuth2
 
 account-hub-on-port-label = Port
 
@@ -165,7 +168,7 @@ account-hub-email-setup-incoming = Incoming server settings
 
 account-hub-email-setup-outgoing = Outgoing server settings
 
-account-hub-email-config-found = Choose your email account type
+account-hub-email-connect-settings = Connect your email settings
 
 account-hub-email-enter-password = Enter your email account password
 
@@ -203,17 +206,19 @@ account-hub-result-addon-label = Requires Add-on
 
 account-hub-edit-configuration = Edit configuration
 
-account-hub-config-success = Configuration found in Mozilla ISPDB
+account-hub-config-success-title = Account settings found automatically.
 
-account-hub-config-success-exchange = Configuration found for a Microsoft Exchange server
+account-hub-config-success-description-db = Configuration found in Mozilla ISPDB.
 
-account-hub-config-success-guess = Configuration found by trying common server names
+account-hub-config-success-description-exchange = Configuration found for a Microsoft Exchange server.
 
-account-hub-config-success-disk = Configuration found in { -brand-short-name } installation
+account-hub-config-success-description-guess = Configuration found by trying common server names.
 
-account-hub-config-success-isp = Configuration found at email provider
+account-hub-config-success-description-disk = Configuration found in { -brand-short-name } installation.
 
-account-hub-config-success-unknown = Configuration found
+account-hub-config-success-description-isp = Configuration found at email provider.
+
+account-hub-config-success-description-read-more = You can <a data-l10n-name="automated-setup-link">read about how automated email setup works.</a>
 
 account-hub-password-info = Your credentials will only be stored locally on your computer
 
@@ -453,11 +458,14 @@ account-hub-success-addon = Successfully installed the add-on
 
 account-hub-success-half-manual = The following settings were found by probing the given server:
 
-account-hub-result-no-encryption = No Encryption
+account-hub-result-security-no-encryption = No Encryption
+    .title = No Encryption
 
-account-hub-result-ssl = SSL/TLS
+account-hub-result-security-ssl = SSL/TLS
+    .title = SSL/TLS
 
-account-hub-result-starttls = STARTTLS
+account-hub-result-security-starttls = STARTTLS
+    .title = STARTTLS
 
 account-hub-credentials-wrong = Authentication failed. Please check the username and password
 

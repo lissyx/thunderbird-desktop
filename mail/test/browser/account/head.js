@@ -410,21 +410,21 @@ function subtest_config_results(template, configType) {
   );
 
   Assert.equal(
-    template.l10n.getAttributes(template.querySelector("#incomingSocketType"))
-      .id,
-    "account-hub-result-ssl",
+    template.l10n.getAttributes(template.querySelector("#sharedSocketType")).id,
+    "account-hub-result-security-ssl",
     `${configType}: Incoming socketType should be as expected`
   );
 
   Assert.equal(
-    template.l10n.getAttributes(template.querySelector("#authenticationType"))
-      .id,
-    "account-hub-result-auth-password",
+    template.l10n.getAttributes(
+      template.querySelector("#sharedAuthenticationType")
+    ).id,
+    "account-hub-result-authentication-password",
     `${configType}: Authentication type should be expected`
   );
 
   Assert.equal(
-    template.querySelector("#incomingUsername").textContent,
+    template.querySelector("#sharedUsername").textContent,
     "john.doe",
     `${configType}: Incoming username should be expected username`
   );
@@ -439,7 +439,7 @@ function subtest_config_results(template, configType) {
  * @param {string} type - The config's server type.
  */
 async function subtest_verify_account_hub_account(tab, user, type) {
-  await BrowserTestUtils.waitForCondition(
+  await TestUtils.waitForCondition(
     () => !!tab.browser.contentWindow.currentAccount,
     "The new account should have been created"
   );
@@ -461,12 +461,10 @@ async function subtest_verify_account_hub_account(tab, user, type) {
       expected: user.email.split("@")[0],
     },
     "incoming server hostname": {
-      // Note: N in the hostName is uppercase
-      actual: incoming.hostName,
+      actual: incoming.hostname,
       expected: `${type}.${user.incomingHost}`,
     },
     "outgoing server hostname": {
-      // And this is lowercase
       actual: outgoing.serverURI.host,
       expected: `smtp.${user.outgoingHost}`,
     },

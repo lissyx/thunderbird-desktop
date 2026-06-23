@@ -97,6 +97,31 @@ add_task(function test_usesPasswordlessAuthentication() {
     "Mixed GSSAPI incoming and OAuth outgoing should not require a password"
   );
 
+  config.incoming.auth = Ci.nsMsgAuthMethod.OAuth2;
+  config.outgoing.auth = Ci.nsMsgAuthMethod.none;
+
+  Assert.ok(
+    config.usesPasswordlessAuthentication(),
+    "OAuth incoming and no-auth outgoing should not require a password"
+  );
+
+  config.incoming.auth = Ci.nsMsgAuthMethod.none;
+  config.outgoing.auth = Ci.nsMsgAuthMethod.none;
+
+  Assert.ok(
+    config.usesPasswordlessAuthentication(),
+    "No-auth incoming and outgoing should not require a password"
+  );
+
+  config.incoming.auth = Ci.nsMsgAuthMethod.none;
+  config.outgoing.auth = Ci.nsMsgAuthMethod.GSSAPI;
+
+  Assert.ok(
+    config.usesPasswordlessAuthentication(),
+    "No-auth incoming and GSSAPI outgoing should not require a password"
+  );
+
+  config.incoming.auth = Ci.nsMsgAuthMethod.GSSAPI;
   config.outgoing.auth = Ci.nsMsgAuthMethod.passwordCleartext;
 
   Assert.ok(
@@ -258,7 +283,7 @@ add_task(function test_getConfiguredHost() {
 
   const graphConfig = new AccountConfig();
   graphConfig.incoming.type = "graph";
-  graphConfig.incoming.exchangeURL = "https://graph.example.com/v1.0";
+  graphConfig.incoming.exchangeURL = "https://graph.example.com/";
   Assert.equal(
     graphConfig.getConfiguredHost(),
     "graph.example.com",

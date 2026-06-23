@@ -877,6 +877,10 @@ export var MailUtils = {
    */
   handleNewsUri(uri, win) {
     // @see {@link https://datatracker.ietf.org/doc/html/rfc5538#section-2.2}
+    if (!URL.canParse(uri)) {
+      console.warn(`Malformed news URI: ${uri}`);
+      return;
+    }
     const url = new URL(uri);
     if (url.pathname.length <= 1) {
       return;
@@ -937,11 +941,11 @@ export var MailUtils = {
         console.warn("No news server set up.");
         return;
       }
-      url.hostname = firstNntpServer.hostName;
+      url.hostname = firstNntpServer.hostname;
       url.port = firstNntpServer.port;
     }
     if (!url.port) {
-      url.port = Ci.nsINntpUrl.DEFAULT_NNTP_PORT;
+      url.port = Ci.nsINntpIncomingServer.DEFAULT_NNTP_PORT;
     }
 
     const tempFile = Services.dirsvc.get("TmpD", Ci.nsIFile);
@@ -989,8 +993,8 @@ export var MailUtils = {
     }
     let spec = "news:";
     if (server) {
-      spec += `//${server.hostName}`;
-      if (server.port != Ci.nsINntpUrl.DEFAULT_NNTP_PORT) {
+      spec += `//${server.hostname}`;
+      if (server.port != Ci.nsINntpIncomingServer.DEFAULT_NNTP_PORT) {
         spec += `:${server.port}`;
       }
       spec += "/";
