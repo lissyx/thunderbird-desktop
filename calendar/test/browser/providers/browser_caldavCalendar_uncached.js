@@ -35,8 +35,7 @@ add_setup(async function () {
 async function promiseIdle() {}
 
 add_task(async function testAlarms() {
-  calendarObserver._batchRequired = true;
-  await runTestAlarms(calendar);
+  await runTestAlarms();
 
   // Be sure the calendar has finished deleting the event.
   await promiseIdle();

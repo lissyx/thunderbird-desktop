@@ -35,12 +35,14 @@ add_setup(async function () {
 });
 
 async function promiseIdle() {
-  await TestUtils.waitForCondition(() => !calendar.wrappedJSObject.mPendingSync);
+  await TestUtils.waitForCondition(
+    () => !calendar.wrappedJSObject.mPendingSync,
+    "waiting for idle"
+  );
 }
 
 add_task(async function testAlarms() {
-  calendarObserver._batchRequired = true;
-  await runTestAlarms(calendar);
+  await runTestAlarms();
 
   // Be sure the calendar has finished deleting the event.
   await promiseIdle();
