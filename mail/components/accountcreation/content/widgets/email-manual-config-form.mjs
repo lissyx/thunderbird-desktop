@@ -5,6 +5,7 @@
 import { AccountHubStep } from "./account-hub-step.mjs";
 import "./account-hub-select.mjs"; // eslint-disable-line import/no-unassigned-import
 import "./account-hub-input.mjs"; // eslint-disable-line import/no-unassigned-import
+import "./account-hub-checkbox.mjs"; // eslint-disable-line import/no-unassigned-import
 
 /**
  * Account Hub Email Manual Config Form Template
@@ -18,6 +19,20 @@ class EmailManualConfigForm extends AccountHubStep {
    */
   #currentConfig = {};
 
+  /**
+   * The checkbox that hides and shows the outgoing username.
+   *
+   * @type {HTMLInputElement}
+   */
+  #sameUsernameCheckbox;
+
+  /**
+   * The outgoing username input.
+   *
+   * @type {HTMLInputElement}
+   */
+  #outgoingUsername;
+
   connectedCallback() {
     if (this.hasConnected) {
       return;
@@ -30,6 +45,23 @@ class EmailManualConfigForm extends AccountHubStep {
       .getElementById("accountHubEmailManualConfigFormTemplate")
       .content.cloneNode(true);
     this.appendChild(template);
+
+    this.#sameUsernameCheckbox = this.querySelector("#sameUsername");
+    this.#outgoingUsername = this.querySelector("#manualOutgoingUsername");
+    this.#sameUsernameCheckbox.setAriaControlsElements(this.#outgoingUsername);
+
+    this.#sameUsernameCheckbox.addEventListener("change", this);
+  }
+
+  handleEvent(event) {
+    switch (event.type) {
+      case "change":
+        this.#outgoingUsername.hidden = this.#sameUsernameCheckbox.checked;
+        this.#outgoingUsername.required = !this.#sameUsernameCheckbox.checked;
+        break;
+      default:
+        break;
+    }
   }
 
   /**

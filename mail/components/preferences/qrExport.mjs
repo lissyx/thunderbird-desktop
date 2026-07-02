@@ -294,7 +294,7 @@ export const qrExportPane = {
       }
     }
     const wizard = document.getElementById("qrCodeWizard");
-    wizard.initializeQRCodes(accountKeys, includePasswords);
+    await wizard.initializeQRCodes(accountKeys, includePasswords);
     if (wizard.getTotalSteps() === 0) {
       this.showIntro();
       return;
@@ -367,8 +367,8 @@ export const qrExportPane = {
     // So there's a primary password. Make the user enter it to proceed.
     try {
       // Relogin and ask for the primary password.
-      token.logout();
-      token.login();
+      await token.logout();
+      await token.login();
     } catch (e) {
       // An exception will be thrown if the user cancels the login prompt dialog.
       // User is also logged out of Software Security Device.

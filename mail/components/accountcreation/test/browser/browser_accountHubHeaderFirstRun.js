@@ -24,6 +24,9 @@ add_setup(async function () {
 });
 
 add_task(async function test_showWelcomeOnFirstRun() {
+  // A bare header isn't driven by a step, so request branding like the steps do.
+  header.showBrandingHeader();
+
   Assert.ok(
     BrowserTestUtils.isHidden(header.shadowRoot.querySelector("#closeButton")),
     "Close button should be hidden on first run"

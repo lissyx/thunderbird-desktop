@@ -124,6 +124,11 @@ static void MimeCMS_content_callback(void* arg, const char* buf,
   if (!data->decoded_buffer) {
     data->decoded_buffer_space = PR_MAX(4096, length * 2);
     data->decoded_buffer = (char*)PR_Malloc(data->decoded_buffer_space);
+    if (!data->decoded_buffer) {
+      PR_SetError(PR_OUT_OF_MEMORY_ERROR, 0);
+      data->output_fn = 0;
+      return;
+    }
     memcpy(data->decoded_buffer, buf, length);
   } else {
     size_t needed = data->decoded_bytes + length;
@@ -534,7 +539,8 @@ static MimeClosure MimeCMS_init(MimeObject* obj,
       // We cannot rely on having smime-type, the parameter is optional,
       // but if we have it, do a sanity check.
       if (thisST && PL_strcasecmp(thisST, "enveloped-data") &&
-          PL_strcasecmp(thisST, "signed-data")) {
+          PL_strcasecmp(thisST, "signed-data") &&
+          PL_strcasecmp(thisST, "authEnveloped-data")) {
         NS_WARNING(
             "mimei.cpp shouldn't have routed this smime-type to this CMS "
             "decoder");
