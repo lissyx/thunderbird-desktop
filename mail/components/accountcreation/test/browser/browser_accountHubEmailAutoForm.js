@@ -9,6 +9,7 @@ let browser;
 let subview;
 let realName;
 let manualConfigButton;
+let thundermailButton;
 let email;
 
 add_setup(async function () {
@@ -23,6 +24,7 @@ add_setup(async function () {
   realName = subview.querySelector("#realName");
   email = subview.querySelector("#email");
   manualConfigButton = subview.querySelector("#manualConfiguration");
+  thundermailButton = subview.querySelector(".account-hub-thundermail-button");
 
   registerCleanupFunction(() => {
     tabmail.closeOtherTabs(tabmail.tabInfo[0]);
@@ -182,6 +184,45 @@ add_task(function test_captureState() {
   subview.resetState();
 });
 
+add_task(function test_disabled() {
+  Assert.ok(!realName.disabled, "Name input should start enabled");
+  Assert.ok(!email.disabled, "Email input should start enabled");
+  Assert.ok(
+    !manualConfigButton.disabled,
+    "Manual config button should start enabled"
+  );
+  Assert.ok(
+    !thundermailButton.disabled,
+    "Thundermail button should start enabled"
+  );
+
+  subview.disabled = true;
+
+  Assert.ok(realName.disabled, "Name input should be disabled");
+  Assert.ok(email.disabled, "Email input should be disabled");
+  Assert.ok(
+    manualConfigButton.disabled,
+    "Manual config button should be disabled"
+  );
+  Assert.ok(
+    thundermailButton.disabled,
+    "Thundermail button should be disabled"
+  );
+
+  subview.disabled = false;
+
+  Assert.ok(!realName.disabled, "Name input should be enabled again");
+  Assert.ok(!email.disabled, "Email input should be enabled again");
+  Assert.ok(
+    !manualConfigButton.disabled,
+    "Manual config button should be enabled again"
+  );
+  Assert.ok(
+    !thundermailButton.disabled,
+    "Thundermail button should be enabled again"
+  );
+});
+
 add_task(async function test_manualConfigEvent() {
   realName.value = "Test";
   email.value = "test@test.com";
@@ -206,11 +247,20 @@ add_task(async function test_manualConfigEvent() {
 });
 
 add_task(async function test_thundermailSignin() {
+  await SpecialPowers.pushPrefEnv({
+    set: [["mail.accounthub.thundermail.enabled", false]],
+  });
+
+  const thundermailHeader = subview.querySelector(
+    ".account-hub-thundermail-header"
+  );
+  await TestUtils.waitForCondition(
+    () => BrowserTestUtils.isHidden(thundermailHeader),
+    "The Thundermail signin button should be hidden when mail.accounthub.thundermail.enabled is false"
+  );
   Assert.ok(
-    BrowserTestUtils.isHidden(
-      subview.querySelector(".account-hub-thundermail-header")
-    ),
-    "The Thundermail signin button should be hidden by default"
+    BrowserTestUtils.isHidden(thundermailHeader),
+    "The Thundermail signin button should be hidden when mail.accounthub.thundermail.enabled is false"
   );
 
   await SpecialPowers.pushPrefEnv({
@@ -219,12 +269,45 @@ add_task(async function test_thundermailSignin() {
 
   const newForm =
     browser.contentWindow.document.createElement("email-auto-form");
+  newForm.setAttribute("title-id", "account-hub-email-setup-header");
 
   browser.contentWindow.document.body.appendChild(newForm);
 
-  Assert.ok(
-    BrowserTestUtils.isVisible(newForm),
+  const newThundermailHeader = newForm.querySelector(
+    ".account-hub-thundermail-header"
+  );
+  await TestUtils.waitForCondition(
+    () => BrowserTestUtils.isVisible(newThundermailHeader),
     "The Thundermail signin button should be visible when mail.accounthub.thundermail.enabled is true"
+  );
+  Assert.ok(
+    BrowserTestUtils.isVisible(newThundermailHeader),
+    "The Thundermail signin button should be visible when mail.accounthub.thundermail.enabled is true"
+  );
+  Assert.equal(
+    newThundermailHeader.slot,
+    "",
+    "The Thundermail signin content should not be a separate step body slot item"
+  );
+  Assert.ok(
+    newForm
+      .querySelector("#autoConfigEmailForm")
+      .contains(newThundermailHeader),
+    "The Thundermail signin content should render inside the email form"
+  );
+  Assert.ok(
+    BrowserTestUtils.isVisible(
+      newThundermailHeader.querySelector(".account-hub-thundermail-title")
+    ),
+    "The email setup title should be shown with the Thundermail signin content"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(
+      newForm.shadowRoot
+        .querySelector("account-hub-header")
+        .shadowRoot.querySelector("#accountHubHeaderTitle")
+    ),
+    "The header title should be hidden when the Thundermail title is shown in the step body"
   );
 
   newForm.remove();
