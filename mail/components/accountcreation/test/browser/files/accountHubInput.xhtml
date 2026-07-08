@@ -20,6 +20,7 @@
           <img src="" alt="" class="form-icon icon-success input-success" />
           <span class="input-error-message"></span>
         </div>
+        <small class="account-hub-form-small-comment" hidden="hidden"></small>
       </template>
       <form>
         <account-hub-input
@@ -30,6 +31,7 @@
           placeholder="mail.example.com"
           required="required"
           classes="input-field manual-input"
+          pattern="\w{3,16}"
         >
         </account-hub-input>
       </form>

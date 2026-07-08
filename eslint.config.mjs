@@ -271,9 +271,23 @@ export default [
     },
   },
   {
+    name: "no-gviewwrapper-dbview",
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "gViewWrapper",
+          property: "dbView",
+          message: "Please use gDBView instead.",
+        },
+      ],
+    },
+  },
+  {
     name: "calendar-tests-use-utc",
     files: ["calendar/test/**/*.js", "calendar/test/**/*.mjs"],
     rules: {
+      // This overrides no-gviewwrapper-dbview above.
       "no-restricted-properties": [
         "error",
         {

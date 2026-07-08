@@ -463,6 +463,28 @@ name = "autocfg"
 version = "1.1.0"
 
 [[package]]
+name = "autofill"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "error-support",
+ "interrupt-support",
+ "jwcrypto",
+ "lazy_static",
+ "rusqlite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sql-support",
+ "sync-guid",
+ "sync15",
+ "thiserror 2.0.12",
+ "types",
+ "uniffi",
+ "url",
+]
+
+[[package]]
 name = "base64"
 version = "0.21.999"
 dependencies = [
@@ -531,7 +553,7 @@ dependencies = [
 [[package]]
 name = "bindgen"
 version = "0.72.0"
-source = "git+https://github.com/rust-lang/rust-bindgen?rev=9366e0af8da529c958b4cd4fcbe492d951c86f5c#9366e0af8da529c958b4cd4fcbe492d951c86f5c"
+source = "git+https://github.com/glandium/rust-bindgen?rev=5274da5a06411accb266c10819b989ac25a81b7d#5274da5a06411accb266c10819b989ac25a81b7d"
 dependencies = [
  "bitflags 2.10.0",
  "cexpr",
@@ -1353,7 +1375,7 @@ dependencies = [
 [[package]]
 name = "cubeb-pulse"
 version = "0.5.0"
-source = "git+https://github.com/mozilla/cubeb-pulse-rs?rev=a3770b75c22ae3fdc12539a0cdccc04d46d791f7#a3770b75c22ae3fdc12539a0cdccc04d46d791f7"
+source = "git+https://github.com/mozilla/cubeb-pulse-rs?rev=88194f91c8778fa608a19af7b91306094525595d#88194f91c8778fa608a19af7b91306094525595d"
 dependencies = [
  "cubeb-backend",
  "pulse",
@@ -2762,6 +2784,7 @@ name = "gkrust-uniffi-components"
 version = "0.1.0"
 dependencies = [
  "ads-client",
+ "autofill",
  "breach-alerts",
  "context_id",
  "error-support",
@@ -4535,8 +4558,8 @@ checksum = "a2983372caf4480544083767bf2d27defafe32af49ab4df3a0b7fc90793a3664"
 
 [[package]]
 name = "naga"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -4561,8 +4584,8 @@ dependencies = [
 
 [[package]]
 name = "naga-types"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
@@ -4925,6 +4948,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-core-graphics"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e022c9d066895efa1345f8e33e584b9f958da2fd4cd116792e15e07e4720a807"
+dependencies = [
+ "dispatch2",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-io-surface",
+]
+
+[[package]]
 name = "objc2-encode"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4974,6 +5009,7 @@ dependencies = [
  "bitflags 2.10.0",
  "objc2",
  "objc2-core-foundation",
+ "objc2-core-graphics",
  "objc2-foundation",
  "objc2-metal",
 ]
@@ -5019,9 +5055,9 @@ checksum = "269bca4c2591a28585d6bf10d9ed0332b7d76900a1b02bec41bdc3a2cdcda107"
 
 [[package]]
 name = "operation-queue"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8656df5fea6ff89e0bcfbe2e34e784f49dc48ddc4bd34ae7e6bb17049b9d9f8d"
+checksum = "87d99d0aa97404633e97fb532114638760f4f713c25c4a227c8b813d4b2b7d53"
 dependencies = [
  "async-channel",
  "async-lock",
@@ -5492,7 +5528,7 @@ dependencies = [
 [[package]]
 name = "pulse"
 version = "0.3.0"
-source = "git+https://github.com/mozilla/cubeb-pulse-rs?rev=a3770b75c22ae3fdc12539a0cdccc04d46d791f7#a3770b75c22ae3fdc12539a0cdccc04d46d791f7"
+source = "git+https://github.com/mozilla/cubeb-pulse-rs?rev=88194f91c8778fa608a19af7b91306094525595d#88194f91c8778fa608a19af7b91306094525595d"
 dependencies = [
  "bitflags 2.10.0",
  "pulse-ffi",
@@ -5501,7 +5537,7 @@ dependencies = [
 [[package]]
 name = "pulse-ffi"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/cubeb-pulse-rs?rev=a3770b75c22ae3fdc12539a0cdccc04d46d791f7#a3770b75c22ae3fdc12539a0cdccc04d46d791f7"
+source = "git+https://github.com/mozilla/cubeb-pulse-rs?rev=88194f91c8778fa608a19af7b91306094525595d#88194f91c8778fa608a19af7b91306094525595d"
 dependencies = [
  "libc",
 ]
@@ -7517,8 +7553,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-core"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -7551,24 +7587,24 @@ dependencies = [
 
 [[package]]
 name = "wgpu-core-deps-apple"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "wgpu-hal",
 ]
 
 [[package]]
 name = "wgpu-core-deps-windows-linux-android"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "wgpu-hal",
 ]
 
 [[package]]
 name = "wgpu-hal"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -7588,6 +7624,7 @@ dependencies = [
  "naga-types",
  "objc2",
  "objc2-core-foundation",
+ "objc2-core-graphics",
  "objc2-foundation",
  "objc2-metal",
  "objc2-quartz-core",
@@ -7609,8 +7646,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-naga-bridge"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "naga",
  "wgpu-types",
@@ -7618,8 +7655,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu-types"
-version = "29.0.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=43981de526bffe6773403029c2e26f18d9c0a976#43981de526bffe6773403029c2e26f18d9c0a976"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu?rev=93e00976015c937fc86f02bd9efcf343c6ce5e5d#93e00976015c937fc86f02bd9efcf343c6ce5e5d"
 dependencies = [
  "bitflags 2.10.0",
  "bytemuck",

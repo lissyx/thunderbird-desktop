@@ -26,9 +26,11 @@
 #include ./accountHubEmailManualConfigFormTemplate.inc.xhtml
 #include ./accountHubEmailOutgoingFormTemplate.inc.xhtml
 #include ./accountHubEmailPasswordFormTemplate.inc.xhtml
+#include ./accountHubEmailProtocolSelectFormTemplate.inc.xhtml
 #include ./accountHubEmailSyncAccountsFormTemplate.inc.xhtml
 #include ./accountHubFooterTemplate.inc.xhtml
 #include ./accountHubHeaderTemplate.inc.xhtml
+#include ./accountHubRadioCardLargeTemplate.inc.xhtml
 #include ./accountHubStepTemplate.inc.xhtml
 <html:template id="accountHubDialog" xmlns="http://www.w3.org/1999/xhtml">
   <dialog class="account-hub-dialog">
@@ -110,6 +112,12 @@
     class="account-hub-step"
   >
   </email-auto-form>
+  <email-protocol-select-form
+    id="emailProtocolSelectSubview"
+    class="account-hub-step"
+    hidden="hidden"
+  >
+  </email-protocol-select-form>
   <email-manual-incoming-form
     id="emailIncomingConfigSubview"
     title-id="account-hub-email-setup-incoming"
@@ -133,6 +141,7 @@
   <email-exchange-settings
     id="emailExchangeSettingsSubview"
     class="account-hub-step"
+    title-id="account-hub-email-exchange-settings"
     hidden="hidden"
   ></email-exchange-settings>
   <email-exchange-type

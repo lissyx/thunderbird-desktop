@@ -67,7 +67,11 @@ account-hub-email-manually-configure-button = Configure Manually
 
 account-hub-email-continue-button = Continue
 
+account-hub-email-set-up-account-button = Set up account
+
 account-hub-email-confirm-button = Confirm
+
+account-hub-email-find-settings-button = Find settings
 
 account-hub-result-incoming-legend = Incoming
 
@@ -140,6 +144,40 @@ account-hub-auth-no-authentication-option =
 
 account-hub-auth-label = Authentication method
 
+## Exchange Type Manual Config Step
+
+account-hub-exchange-type-account-type = Account type
+
+account-hub-card-graph-title = Microsoft Graph
+
+account-hub-card-graph-description = Microsoft Graph is a modern connection method for Microsoft 365.
+
+account-hub-card-ews-title = Exchange Web Services
+
+account-hub-card-ews-tag = Legacy
+
+account-hub-card-ews-description = Exchange Web Services (EWS) connects to Microsoft Exchange to sync your mail.
+
+# This is shown after the type description, so "it" is referring to the type (either Microsoft Graph or Exchange Web Services).
+account-hub-card-recommended-description = It’s recommended because it matches your Service URL.
+
+account-hub-exchange-type-username = Username
+
+account-hub-exchange-type-username-hint = Typically your email address or Active Directory UPN.
+
+account-hub-exchange-type-authentication = Authentication Method
+
+# Checkbox that can be unchecked to use a custom OAuth config.
+account-hub-exchange-type-default-oauth = Use default Microsoft 365 Copilot authentication settings
+
+account-hub-exchange-type-oauth-tenant = Tenant ID
+
+account-hub-exchange-type-oauth-app = App ID
+
+account-hub-exchange-type-advanced-config = Advanced Configuration
+
+## Other Account Hub strings (sadly not sorted into sections)
+
 account-hub-result-username-label = Username
     .title = Username
 
@@ -168,7 +206,11 @@ account-hub-email-setup-incoming = Incoming server settings
 
 account-hub-email-setup-outgoing = Outgoing server settings
 
+account-hub-email-exchange-settings = Exchange settings
+
 account-hub-email-connect-settings = Connect your email settings
+
+account-hub-email-protocol-select-notification = Additional information is required to set up this account
 
 account-hub-email-enter-password = Enter your email account password
 
@@ -396,6 +438,8 @@ address-book-ldap-creation-error = Could not create LDAP Directory.
 account-hub-email-setup-ews = Server Settings
 
 account-hub-result-exchange-url-label = Exchange endpoint URL
+
+account-hub-exchange-service-url-label = Enter the service URL
 
 account-hub-email-credentials-confirmation = Account Configuration
 

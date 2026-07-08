@@ -475,80 +475,75 @@ function InitViewSortByMenu() {
   if (tab?.mode.name != "mail3PaneTab") {
     return;
   }
+  goUpdateThreadPaneSortMenu(
+    tab.chromeBrowser.contentWindow.gViewWrapper,
+    document.getElementById("menu_viewSortPopup")
+  );
+}
 
-  const { gViewWrapper } = tab.chromeBrowser.contentWindow;
-  if (!gViewWrapper?.dbView) {
+function goUpdateThreadPaneSortMenu(viewWrapper, menuPopup) {
+  if (!viewWrapper) {
     return;
   }
 
-  const { primarySortType, primarySortOrder, showGroupedBySort, showThreaded } =
-    gViewWrapper;
+  const {
+    primarySortType,
+    primarySortOrder,
+    showThreaded,
+    showUnthreaded,
+    showGroupedBySort,
+  } = viewWrapper;
 
-  const isSortTypeValidForGrouping = [
-    Ci.nsMsgViewSortType.byAccount,
-    Ci.nsMsgViewSortType.byAttachments,
-    Ci.nsMsgViewSortType.byAuthor,
-    Ci.nsMsgViewSortType.byCorrespondent,
-    Ci.nsMsgViewSortType.byDate,
-    Ci.nsMsgViewSortType.byFlagged,
-    Ci.nsMsgViewSortType.byLocation,
-    Ci.nsMsgViewSortType.byPriority,
-    Ci.nsMsgViewSortType.byReceived,
-    Ci.nsMsgViewSortType.byRecipient,
-    Ci.nsMsgViewSortType.byStatus,
-    Ci.nsMsgViewSortType.bySubject,
-    Ci.nsMsgViewSortType.byTags,
-    Ci.nsMsgViewSortType.byCustom,
-  ].includes(primarySortType);
-
-  const setSortItemAttrs = function (id, sortKey) {
-    const menuItem = document.getElementById(id);
+  // Update menuitem to reflect sort key.
+  for (const menuItem of menuPopup.querySelectorAll(`[name="sortby"]`)) {
     menuItem.toggleAttribute(
       "checked",
-      primarySortType == Ci.nsMsgViewSortType[sortKey]
+      primarySortType == Ci.nsMsgViewSortType[menuItem.value]
     );
-  };
+  }
 
-  setSortItemAttrs("sortByDateMenuitem", "byDate");
-  setSortItemAttrs("sortByReceivedMenuitem", "byReceived");
-  setSortItemAttrs("sortByFlagMenuitem", "byFlagged");
-  setSortItemAttrs("sortByOrderReceivedMenuitem", "byId");
-  setSortItemAttrs("sortByPriorityMenuitem", "byPriority");
-  setSortItemAttrs("sortBySizeMenuitem", "bySize");
-  setSortItemAttrs("sortByStatusMenuitem", "byStatus");
-  setSortItemAttrs("sortBySubjectMenuitem", "bySubject");
-  setSortItemAttrs("sortByUnreadMenuitem", "byUnread");
-  setSortItemAttrs("sortByTagsMenuitem", "byTags");
-  setSortItemAttrs("sortByJunkStatusMenuitem", "byJunkStatus");
-  setSortItemAttrs("sortByFromMenuitem", "byAuthor");
-  setSortItemAttrs("sortByRecipientMenuitem", "byRecipient");
-  setSortItemAttrs("sortByAttachmentsMenuitem", "byAttachments");
-  setSortItemAttrs("sortByCorrespondentMenuitem", "byCorrespondent");
-
-  document
-    .getElementById("sortAscending")
+  // Update sort direction menu items.
+  menuPopup
+    .querySelector(`[value="ascending"]`)
     .toggleAttribute(
       "checked",
       primarySortOrder == Ci.nsMsgViewSortOrder.ascending
     );
-  document
-    .getElementById("sortDescending")
+  menuPopup
+    .querySelector(`[value="descending"]`)
     .toggleAttribute(
       "checked",
       primarySortOrder == Ci.nsMsgViewSortOrder.descending
     );
 
-  document
-    .getElementById("sortThreaded")
+  // Update the threaded menu items.
+  menuPopup
+    .querySelector(`[value="threaded"]`)
     .toggleAttribute("checked", showThreaded);
-  document
-    .getElementById("sortUnthreaded")
-    .toggleAttribute("checked", !showThreaded && !showGroupedBySort);
-
-  const groupBySortOrderMenuItem = document.getElementById("groupBySort");
+  menuPopup
+    .querySelector(`[value="unthreaded"]`)
+    .toggleAttribute("checked", showUnthreaded);
+  const groupBySortOrderMenuItem = menuPopup.querySelector(
+    `[value="groupedBySort"]`
+  );
   groupBySortOrderMenuItem.toggleAttribute(
     "disabled",
-    !isSortTypeValidForGrouping
+    ![
+      Ci.nsMsgViewSortType.byAccount,
+      Ci.nsMsgViewSortType.byAttachments,
+      Ci.nsMsgViewSortType.byAuthor,
+      Ci.nsMsgViewSortType.byCorrespondent,
+      Ci.nsMsgViewSortType.byDate,
+      Ci.nsMsgViewSortType.byFlagged,
+      Ci.nsMsgViewSortType.byLocation,
+      Ci.nsMsgViewSortType.byPriority,
+      Ci.nsMsgViewSortType.byReceived,
+      Ci.nsMsgViewSortType.byRecipient,
+      Ci.nsMsgViewSortType.byStatus,
+      Ci.nsMsgViewSortType.bySubject,
+      Ci.nsMsgViewSortType.byTags,
+      Ci.nsMsgViewSortType.byCustom,
+    ].includes(primarySortType)
   );
   groupBySortOrderMenuItem.toggleAttribute("checked", showGroupedBySort);
 }
@@ -1107,60 +1102,6 @@ function MsgNewMessage(event) {
       msgFolder,
       []
     );
-  }
-}
-
-/** Open subscribe window. */
-function MsgSubscribe(folder) {
-  var preselectedFolder = folder || GetFirstSelectedMsgFolder();
-
-  if (FeedUtils.isFeedFolder(preselectedFolder)) {
-    // Open feed subscription dialog.
-    openSubscriptionsDialog(preselectedFolder);
-  } else {
-    // Open IMAP/NNTP subscription dialog.
-    Subscribe(preselectedFolder);
-  }
-}
-
-/**
- * Show a confirmation dialog - check if the user really want to unsubscribe
- * from the given newsgroup/s.
- *
- * @param {nsIMsgFolder[]} folders - Newsgroup folders to unsubscribe from.
- * @returns {boolean} true if the user said it's ok to unsubscribe
- */
-function ConfirmUnsubscribe(folders) {
-  var bundle = document.getElementById("bundle_messenger");
-  var titleMsg = bundle.getString("confirmUnsubscribeTitle");
-  var dialogMsg =
-    folders.length == 1
-      ? bundle.getFormattedString(
-          "confirmUnsubscribeText",
-          [folders[0].localizedName],
-          1
-        )
-      : bundle.getString("confirmUnsubscribeManyText");
-
-  return Services.prompt.confirm(window, titleMsg, dialogMsg);
-}
-
-/**
- * Unsubscribe from selected or passed in newsgroup/s.
- *
- * @param {nsIMsgFolder[]} folders - The folders to unsubscribe.
- */
-function MsgUnsubscribe(folders) {
-  if (!ConfirmUnsubscribe(folders)) {
-    return;
-  }
-
-  for (let i = 0; i < folders.length; i++) {
-    const subscribableServer = folders[i].server.QueryInterface(
-      Ci.nsISubscribableServer
-    );
-    subscribableServer.unsubscribe(folders[i].name);
-    subscribableServer.commitSubscribeChanges();
   }
 }
 

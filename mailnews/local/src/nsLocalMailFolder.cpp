@@ -246,8 +246,8 @@ NS_IMETHODIMP nsMsgLocalMailFolder::ParseFolder(nsIMsgWindow* window,
                         prettyPath.get(), static_cast<uint32_t>(rv));
     NS_WARNING(msg.get());
     msg.Append("\nRepairing the folder may fix this issue."_ns);
-    MsgLogToConsole4(NS_ConvertUTF8toUTF16(msg), nsCString(__FILE__), __LINE__,
-                     nsIScriptError::errorFlag);
+    MsgLogToConsole4(NS_ConvertUTF8toUTF16(msg), nsDependentCString(__FILE__),
+                     __LINE__, nsIScriptError::errorFlag);
     if (listener) {
       // Avoid synchronous re-entrancy: notify the listener via the event loop
       // to ensure the initiating caller has returned and cleared the stack.
@@ -2212,15 +2212,28 @@ nsMsgLocalMailFolder::EndCopy(bool aCopySucceeded) {
   mCopyState->m_LineReader.Flush(
       std::bind(&nsMsgLocalMailFolder::CopyLine, this, std::placeholders::_1));
 
+  // Committing a header is only correct once the parser has finalized it, which
+  // happens at the blank line between headers and body. An empty, headerless,
+  // or truncated source never reaches that point, so its header is never parsed
+  // and carries no date (rendering as 1970). Treat such input as a failed copy
+  // and discard it rather than persisting an empty, dateless placeholder.
+  if (aCopySucceeded && !mCopyState->m_writeFailed &&
+      mCopyState->m_parseMsgState) {
+    nsMailboxParseState parseState;
+    mCopyState->m_parseMsgState->GetState(&parseState);
+    if (parseState == nsIMsgParseMailMsgState::ParseHeadersState) {
+      // Mark the copy as failed and let the shared cleanup path below discard
+      // the in-progress message.
+      aCopySucceeded = false;
+    }
+  }
+
   // we are the destination folder for a move/copy
   nsresult rv = aCopySucceeded ? NS_OK : NS_ERROR_FAILURE;
 
   if (!aCopySucceeded || mCopyState->m_writeFailed) {
     if (mCopyState->m_fileStream) {
-      if (mCopyState->m_curDstKey != nsMsgKey_None) {
-        mCopyState->m_msgStore->DiscardNewMessage(this,
-                                                  mCopyState->m_fileStream);
-      }
+      mCopyState->m_msgStore->DiscardNewMessage(this, mCopyState->m_fileStream);
       mCopyState->m_fileStream = nullptr;
     }
 
