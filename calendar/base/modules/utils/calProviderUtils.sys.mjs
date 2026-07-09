@@ -462,6 +462,7 @@ export var provider = {
     static get mTransientProperties() {
       return {
         "cache.uncachedCalendar": true,
+        initialSortOrderPos: true,
         currentStatus: true,
         "itip.transport": true,
         "imip.identity": true,
@@ -956,10 +957,19 @@ ChromeUtils.defineLazyGetter(provider, "providers", () => {
   const { CalDavProvider } = ChromeUtils.importESModule(
     "resource:///modules/CalDavProvider.sys.mjs"
   );
-  return new Map([
+  const result = new Map([
     ["ics", CalICSProvider],
     ["caldav", CalDavProvider],
   ]);
+
+  if (Services.prefs.getBoolPref("calendar.graph.enabled", false)) {
+    const { GraphProvider } = ChromeUtils.importESModule(
+      "resource:///modules/GraphProvider.sys.mjs"
+    );
+    result.set("graph", GraphProvider);
+  }
+
+  return result;
 });
 
 // This is the transport returned by getImipTransport().

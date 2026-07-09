@@ -15,6 +15,62 @@ import "./account-hub-checkbox.mjs"; // eslint-disable-line import/no-unassigned
  * @tagname email-exchange-type
  */
 class EmailExchangeType extends AccountHubStep {
+  /**
+   * The account type radio cards.
+   *
+   * @type {NodeListOf<HTMLElement>}
+   */
+  #accountTypeCards;
+
+  /**
+   * The Authentication Method select.
+   *
+   * @type {AccountHubSelect}
+   */
+  #authenticationSelect;
+
+  /**
+   * The container for default and custom OAuth settings.
+   *
+   * @type {HTMLElement}
+   */
+  #oauthOptions;
+
+  /**
+   * The checkbox for using default OAuth settings.
+   *
+   * @type {HTMLInputElement}
+   */
+  #defaultOauthCheckbox;
+
+  /**
+   * The custom OAuth settings.
+   *
+   * @type {HTMLElement}
+   */
+  #oauthCustomOptions;
+
+  /**
+   * The custom OAuth tenant ID input.
+   *
+   * @type {AccountHubInput}
+   */
+  #oauthTenantInput;
+
+  /**
+   * The custom OAuth application ID input.
+   *
+   * @type {AccountHubInput}
+   */
+  #oauthApplicationInput;
+
+  /**
+   * The available authentication options.
+   *
+   * @type {object}
+   */
+  #authenticationOptions;
+
   connectedCallback() {
     if (this.hasConnected) {
       return;
@@ -27,6 +83,85 @@ class EmailExchangeType extends AccountHubStep {
       .getElementById("accountHubEmailExchangeTypeTemplate")
       .content.cloneNode(true);
     this.appendChild(template);
+
+    this.#authenticationSelect = this.querySelector(
+      "#exchangeTypeAuthentication"
+    );
+    this.#accountTypeCards = this.querySelectorAll(
+      "account-hub-radio-card-large"
+    );
+    this.#authenticationOptions = {
+      normalPassword: this.querySelector("#incomingAuthMethodCleartext"),
+      ntlm: this.querySelector("#incomingAuthMethodNtlm"),
+      oauth2: this.querySelector("#incomingAuthMethodOAuth2"),
+    };
+    this.#oauthOptions = this.querySelector("#exchangeTypeOauthOptions");
+    this.#defaultOauthCheckbox = this.querySelector(
+      "#exchangeTypeDefaultOauth"
+    );
+    this.#oauthCustomOptions = this.querySelector("#exchangeTypeOauthCustom");
+    this.#oauthTenantInput = this.querySelector("#exchangeTypeOauthTenant");
+    this.#oauthApplicationInput = this.querySelector("#exchangeTypeOauthApp");
+    this.#authenticationSelect.select.ariaControlsElements = [
+      this.#oauthOptions,
+    ];
+    this.#defaultOauthCheckbox.setAriaControlsElements(
+      this.#oauthTenantInput,
+      this.#oauthApplicationInput
+    );
+
+    this.querySelector("#exchangeTypeForm").addEventListener("change", this);
+
+    this.#updateAuthenticationOptions();
+  }
+
+  handleEvent(event) {
+    switch (event.type) {
+      case "change":
+        this.#updateAuthenticationOptions();
+        break;
+    }
+  }
+
+  /**
+   * Update the available authentication options based on the account type.
+   */
+  #updateAuthenticationOptions() {
+    const selectedAccountType =
+      Array.from(this.#accountTypeCards).find(card => card.checked)?.value ||
+      this.#accountTypeCards[0]?.value;
+    const isGraphSelected = selectedAccountType == "graph";
+
+    this.#authenticationOptions.normalPassword.hidden = isGraphSelected;
+    this.#authenticationOptions.ntlm.hidden = isGraphSelected;
+
+    if (isGraphSelected) {
+      this.#authenticationSelect.value = Ci.nsMsgAuthMethod.OAuth2;
+    }
+
+    this.#updateOauthOptions();
+  }
+
+  /**
+   * Update the visibility of the OAuth defaults and custom options.
+   */
+  #updateOauthOptions() {
+    const isOAuth2Selected =
+      this.#authenticationSelect.value == Ci.nsMsgAuthMethod.OAuth2;
+    const customOptionsHidden =
+      !isOAuth2Selected || this.#defaultOauthCheckbox.checked;
+
+    this.#oauthOptions.hidden = !isOAuth2Selected;
+    this.#authenticationSelect.select.ariaExpanded = isOAuth2Selected;
+    this.#oauthCustomOptions.hidden = customOptionsHidden;
+    this.#defaultOauthCheckbox.setAriaExpanded(!customOptionsHidden);
+
+    for (const input of this.#oauthCustomOptions.querySelectorAll("input")) {
+      if (input.required || input.dataset.wasRequired) {
+        input.required = !customOptionsHidden;
+        input.dataset.wasRequired = true;
+      }
+    }
   }
 
   /**

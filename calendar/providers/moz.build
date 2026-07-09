@@ -5,6 +5,7 @@
 DIRS += [
     "caldav",
     "composite",
+    "graph",
     "ics",
     "memory",
     "storage",
