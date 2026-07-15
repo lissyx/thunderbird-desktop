@@ -78,3 +78,46 @@ def remove_enterprise_complete(config, jobs):
         if "complete" in config.kind and "enterprise" not in config.params["project"] and "enterprise" in job["name"]:
             continue
         yield job
+
+
+def maybe_add_dep(job, dep):
+    if dep not in job["fetches"]["toolchain"]:
+        job["fetches"]["toolchain"].append(dep)
+
+
+def maybe_add_cargo_vet_dep(job):
+    cargo_vet = None
+    th_platform = job["treeherder"]["platform"]
+    if "win" in th_platform:
+        cargo_vet = "win64-cargo-vet"
+    elif "osx" in th_platform:
+        if "aarch64" in th_platform:
+            cargo_vet = "macosx64-aarch64-cargo-vet"
+        else:
+            cargo_vet = "macosx64-cargo-vet"
+    elif "linux" in th_platform:
+        if "aarch64" in th_platform:
+            cargo_vet = "linux64-aarch64-cargo-vet"
+        else:
+            cargo_vet = "linux64-cargo-vet"
+
+    assert cargo_vet, f"Missing cargo_vet: for job {job['name']}: {th_platform}"
+    maybe_add_dep(job, cargo_vet)
+
+
+@transforms.add
+def add_tbrust_vendor(config, jobs):
+    for job in jobs:
+        if "enterprise" in config.params["project"]:
+            if (config.kind == "build" or "l10n" in config.kind) and "enterprise" in job["name"]:
+                has_tbrust_vendor = "tbrust-vendor" in job["run"]["actions"]
+                if not has_tbrust_vendor:
+                    job["run"]["actions"] = ["tbrust-vendor"] + job["run"]["actions"]
+
+                    maybe_add_cargo_vet_dep(job)
+
+                    if "l10n" in config.kind:
+                        maybe_add_dep(job, "linux64-node")
+                        maybe_add_dep(job, "linux64-rust")
+
+        yield job
