@@ -4,6 +4,10 @@
 
 "use strict";
 
+const { AccountConfig } = ChromeUtils.importESModule(
+  "resource:///modules/accountcreation/AccountConfig.sys.mjs"
+);
+
 const tabmail = document.getElementById("tabmail");
 let browser;
 let subview;
@@ -15,6 +19,7 @@ let oauthOptionsWrapperElement;
 let customOauthWrapperElement;
 let oauthTenantInput;
 let oauthApplicationInput;
+let advancedConfigButton;
 
 add_setup(async function () {
   const tab = tabmail.openTab("contentTab", {
@@ -39,6 +44,9 @@ add_setup(async function () {
   customOauthWrapperElement = subview.querySelector("#exchangeTypeOauthCustom");
   oauthTenantInput = subview.querySelector("#exchangeTypeOauthTenant");
   oauthApplicationInput = subview.querySelector("#exchangeTypeOauthApp");
+  advancedConfigButton = subview.querySelector(
+    "#advancedConfigurationExchange"
+  );
 
   registerCleanupFunction(() => {
     tabmail.closeOtherTabs(tabmail.tabInfo[0]);
@@ -151,6 +159,69 @@ function assertAriaControlState(
   );
 }
 
+function setUsername(value) {
+  subview.querySelector("#exchangeTypeUsername").value = value;
+}
+
+function setDefaultOauth(checked) {
+  defaultOauthInput.checked = checked;
+  defaultOauthInput.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setCustomOauthDetails(tenant, clientId) {
+  setDefaultOauth(false);
+  subview.querySelector("#exchangeTypeOauthTenant").value = tenant;
+  subview.querySelector("#exchangeTypeOauthApp").value = clientId;
+}
+
+function createIncomingConfig(type, auth, username, exchangeURL) {
+  const config = new AccountConfig();
+  config.incoming.type = type;
+  config.incoming.auth = auth;
+  config.incoming.username = username;
+  config.incoming.exchangeURL = exchangeURL;
+  return config;
+}
+
+function subtest_assertRecommendedCard(recommendedCard, otherCard, message) {
+  const recommendedBadge = recommendedCard.querySelector(".badge");
+  const recommendedDescription = recommendedCard.querySelector(
+    ".recommended-description"
+  );
+  const recommendedOtherTags = recommendedCard.querySelectorAll(
+    '[slot="tag"]:not(.badge)'
+  );
+  const otherBadge = otherCard.querySelector(".badge");
+  const otherDescription = otherCard.querySelector(".recommended-description");
+  const otherTags = otherCard.querySelectorAll('[slot="tag"]:not(.badge)');
+
+  Assert.ok(
+    BrowserTestUtils.isVisible(recommendedBadge),
+    `${message} should show the recommended badge`
+  );
+  Assert.ok(
+    BrowserTestUtils.isVisible(recommendedDescription),
+    `${message} should show the recommended description`
+  );
+  Assert.ok(
+    Array.from(recommendedOtherTags).every(BrowserTestUtils.isHidden),
+    `${message} should hide other tag slot content on the recommended card`
+  );
+
+  Assert.ok(
+    BrowserTestUtils.isHidden(otherBadge),
+    `${message} should hide the other card's recommended badge`
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(otherDescription),
+    `${message} should hide the other card's recommended description`
+  );
+  Assert.ok(
+    Array.from(otherTags).every(BrowserTestUtils.isVisible),
+    `${message} should show other tag slot content on the non-recommended card`
+  );
+}
+
 add_task(function test_titleHasFluentId() {
   const header = subview.shadowRoot.querySelector("account-hub-header");
   const titleFluentId = header.l10n.getAttributes(
@@ -161,6 +232,22 @@ add_task(function test_titleHasFluentId() {
     titleFluentId,
     "account-hub-exchange-type-title",
     "Exchange type title should use the expected fluent ID"
+  );
+});
+
+add_task(async function test_advancedConfigurationDispatchesEvent() {
+  const advancedConfigEvent = BrowserTestUtils.waitForEvent(
+    subview,
+    "advanced-config"
+  );
+
+  advancedConfigButton.click();
+
+  const event = await advancedConfigEvent;
+  Assert.equal(
+    event.target,
+    subview,
+    "Advanced configuration should be requested from the Exchange type subview"
   );
 });
 
@@ -361,5 +448,210 @@ add_task(async function test_ewsPasswordStillHidesDefaultOauth() {
     [oauthTenantInput, oauthApplicationInput],
     false,
     "Default OAuth checkbox"
+  );
+});
+
+add_task(function test_setStatePrefillsAutodiscoveredExchangeConfig() {
+  const config = createIncomingConfig(
+    "exchange",
+    Ci.nsMsgAuthMethod.passwordCleartext,
+    "autodiscovered@example.com",
+    "https://outlook.office365.com/EWS/Exchange.asmx"
+  );
+
+  subview.setState(config);
+
+  Assert.ok(
+    ewsCard.checked,
+    "An autodiscovered Exchange config should preselect EWS"
+  );
+  Assert.equal(
+    subview.querySelector("#exchangeTypeUsername").value,
+    "autodiscovered@example.com",
+    "The username should be prefilled from the discovered config"
+  );
+  Assert.equal(
+    authenticationSelect.value,
+    String(Ci.nsMsgAuthMethod.passwordCleartext),
+    "The authentication method should be prefilled from the discovered config"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(oauthOptionsWrapperElement),
+    "OAuth defaults should stay hidden for a discovered password auth config"
+  );
+});
+
+add_task(function test_setStatePrefillsDiscoveredGraphConfig() {
+  const config = createIncomingConfig(
+    "graph",
+    Ci.nsMsgAuthMethod.OAuth2,
+    "graph-user@example.com",
+    "https://graph.microsoft.com/v1.0"
+  );
+
+  subview.setState(config);
+
+  Assert.ok(graphCard.checked, "A Graph config should preselect Graph");
+  Assert.equal(
+    subview.querySelector("#exchangeTypeUsername").value,
+    "graph-user@example.com",
+    "The username should be prefilled from the Graph config"
+  );
+  Assert.equal(
+    authenticationSelect.value,
+    String(Ci.nsMsgAuthMethod.OAuth2),
+    "Graph should prefill OAuth2 authentication"
+  );
+  Assert.ok(
+    BrowserTestUtils.isVisible(oauthOptionsWrapperElement),
+    "OAuth defaults should be visible for a discovered OAuth2 config"
+  );
+});
+
+add_task(function test_setStateRecommendsGraphForGraphURL() {
+  const config = new AccountConfig();
+  config.incoming.exchangeURL = "https://graph.microsoft.com/v1.0";
+
+  subview.setState(config);
+
+  Assert.ok(graphCard.checked, "Graph should be selected for a Graph URL");
+  subtest_assertRecommendedCard(graphCard, ewsCard, "A Graph URL");
+});
+
+add_task(function test_setStateRecommendsEwsForNonGraphURL() {
+  const config = new AccountConfig();
+  config.incoming.exchangeURL =
+    "https://outlook.office365.com/EWS/Exchange.asmx";
+
+  subview.setState(config);
+
+  Assert.ok(ewsCard.checked, "EWS should be selected for a non-Graph URL");
+  subtest_assertRecommendedCard(ewsCard, graphCard, "A non-Graph URL");
+});
+
+add_task(function test_setStateKeepsStoredTypeOverRecommendation() {
+  const config = createIncomingConfig(
+    "ews",
+    Ci.nsMsgAuthMethod.OAuth2,
+    "ews-user@example.com",
+    "https://graph.microsoft.com/"
+  );
+
+  subview.setState(config);
+
+  Assert.ok(
+    ewsCard.checked,
+    "The stored account type should remain selected over the recommendation"
+  );
+  subtest_assertRecommendedCard(
+    graphCard,
+    ewsCard,
+    "A Graph URL with stored EWS"
+  );
+});
+
+add_task(function test_captureGraphState() {
+  const settingsConfig = new AccountConfig();
+  settingsConfig.incoming.exchangeURL = "https://graph.microsoft.com/v1.0";
+  subview.setState(settingsConfig);
+
+  changeAccountType(graphCard);
+  setUsername("test@example.com");
+  setDefaultOauth(true);
+
+  const config = subview.captureState();
+
+  Assert.ok(
+    config instanceof AccountConfig,
+    "Capture state should return an AccountConfig"
+  );
+  Assert.equal(
+    config.source,
+    AccountConfig.kSourceUser,
+    "Exchange type state should be user-entered"
+  );
+  Assert.equal(config.incoming.type, "graph", "Graph should be captured");
+  Assert.equal(
+    config.incoming.exchangeURL,
+    settingsConfig.incoming.exchangeURL,
+    "Graph endpoint should match what config passed in"
+  );
+  Assert.equal(
+    config.incoming.hostname,
+    "graph.microsoft.com",
+    "Graph hostname should be captured from the endpoint"
+  );
+  Assert.equal(
+    config.incoming.auth,
+    Ci.nsMsgAuthMethod.OAuth2,
+    "Graph should capture OAuth2 authentication"
+  );
+  Assert.equal(
+    config.incoming.username,
+    "test@example.com",
+    "Username should be captured"
+  );
+  Assert.equal(
+    config.incoming.oauthSettings,
+    null,
+    "Default OAuth should not capture custom OAuth settings"
+  );
+});
+
+add_task(function test_captureCustomOauthState() {
+  changeAccountType(graphCard);
+  setUsername("test@example.com");
+  setCustomOauthDetails("test-tenant", "test-client-id");
+
+  const config = subview.captureState();
+
+  Assert.deepEqual(
+    config.incoming.oauthSettings,
+    {
+      useCustomDetails: true,
+      tenant: "test-tenant",
+      clientId: "test-client-id",
+      authorizationEndpoint:
+        "https://login.microsoftonline.com/test-tenant/oauth2/v2.0/authorize",
+      tokenEndpoint:
+        "https://login.microsoftonline.com/test-tenant/oauth2/v2.0/token",
+    },
+    "Custom OAuth details should be captured"
+  );
+});
+
+add_task(function test_captureEwsState() {
+  const settingsConfig = new AccountConfig();
+  settingsConfig.incoming.exchangeURL =
+    "https://outlook.office365.com/EWS/Exchange.asmx";
+  subview.setState(settingsConfig);
+
+  changeAccountType(ewsCard);
+  setUsername("test@example.com");
+  setDefaultOauth(true);
+  changeAuthenticationMethod(String(Ci.nsMsgAuthMethod.passwordCleartext));
+
+  const config = subview.captureState();
+
+  Assert.equal(config.incoming.type, "ews", "EWS should be captured");
+  Assert.equal(
+    config.incoming.exchangeURL,
+    settingsConfig.incoming.exchangeURL,
+    "EWS endpoint should match what config passed in"
+  );
+  Assert.equal(
+    config.incoming.hostname,
+    "outlook.office365.com",
+    "EWS hostname should be captured from the endpoint"
+  );
+  Assert.equal(
+    config.incoming.auth,
+    Ci.nsMsgAuthMethod.passwordCleartext,
+    "EWS should capture the selected authentication method"
+  );
+  Assert.equal(
+    config.incoming.username,
+    "test@example.com",
+    "Username should be captured"
   );
 });

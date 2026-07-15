@@ -130,6 +130,32 @@ nsIMsgWindow** getter_AddRefs(AutoProxyReleaseMsgWindow& aSmartPtr) {
   return aSmartPtr.StartAssignment();
 }
 
+class ImapInputStreamCallback final : public nsIInputStreamCallback {
+ public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSIINPUTSTREAMCALLBACK
+
+  explicit ImapInputStreamCallback(nsIInputStreamCallback* aCallback)
+      : mCallback(aCallback) {}
+
+ private:
+  ~ImapInputStreamCallback() {
+    // AsyncWait may release its callback on any thread, but nsImapProtocol
+    // owns main-thread-only objects.
+    NS_ReleaseOnMainThread("ImapInputStreamCallback::mCallback",
+                           mCallback.forget());
+  }
+
+  nsCOMPtr<nsIInputStreamCallback> mCallback;
+};
+
+NS_IMPL_ISUPPORTS(ImapInputStreamCallback, nsIInputStreamCallback)
+
+NS_IMETHODIMP ImapInputStreamCallback::OnInputStreamReady(
+    nsIAsyncInputStream* aStream) {
+  return mCallback->OnInputStreamReady(aStream);
+}
+
 NS_IMPL_ISUPPORTS(nsMsgImapHdrXferInfo, nsIImapHeaderXferInfo)
 
 nsMsgImapHdrXferInfo::nsMsgImapHdrXferInfo() : m_hdrInfos(kNumHdrsToXfer) {
@@ -1605,7 +1631,8 @@ bool nsImapProtocol::HandleIdleResponses() {
       nsCOMPtr<nsIAsyncInputStream> asyncInputStream =
           do_QueryInterface(m_inputStream);
       if (asyncInputStream) {
-        asyncInputStream->AsyncWait(this, 0, 0, nullptr);
+        RefPtr callback = MakeRefPtr<ImapInputStreamCallback>(this);
+        asyncInputStream->AsyncWait(callback, 0, 0, nullptr);
         Log("HandleIdleResponses", nullptr, "idle mode async waiting");
       }
     }
@@ -3306,9 +3333,7 @@ void nsImapProtocol::ProcessSelectedStateURL() {
             }
           }
         } break;
-        case nsIImapUrl::nsImapOnlineToOfflineCopy:
-        case nsIImapUrl::nsImapOnlineToOfflineMove: {
-          // Only happens for copy between servers, not for move.
+        case nsIImapUrl::nsImapOnlineToOfflineCopy: {
           nsCString messageIdString;
           nsresult rv = m_runningUrl->GetListOfMessageIds(messageIdString);
           if (NS_SUCCEEDED(rv)) {
@@ -3325,33 +3350,7 @@ void nsImapProtocol::ProcessSelectedStateURL() {
               copyStatus = GetServerStateParser().LastCommandSuccessful()
                                ? ImapOnlineCopyStateType::kSuccessfulCopy
                                : ImapOnlineCopyStateType::kFailedCopy;
-
               m_imapMailFolderSink->OnlineCopyCompleted(this, copyStatus);
-              if (GetServerStateParser().LastCommandSuccessful() &&
-                  (m_imapAction == nsIImapUrl::nsImapOnlineToOfflineMove)) {
-                // Note: action nsImapOnlineToOfflineMove never occurs.
-                Store(messageIdString, "+FLAGS (\\Deleted \\Seen)",
-                      bMessageIdsAreUids);
-                if (GetServerStateParser().LastCommandSuccessful()) {
-                  copyStatus = ImapOnlineCopyStateType::kSuccessfulDelete;
-                  // Only when pref "expunge_after_delete" is set: if server is
-                  // UIDPLUS capable, expunge the UIDs just marked deleted;
-                  // otherwise, go ahead and expunge the full mailbox of ALL
-                  // emails marked as deleted in mailbox, not just the ones
-                  // marked as deleted here.
-                  if (gExpungeAfterDelete) {
-                    if (GetServerStateParser().GetCapabilityFlag() &
-                        kUidplusCapability) {
-                      UidExpunge(messageIdString);
-                    } else {
-                      Expunge();
-                    }
-                  }
-                } else {
-                  copyStatus = ImapOnlineCopyStateType::kFailedDelete;
-                }
-                m_imapMailFolderSink->OnlineCopyCompleted(this, copyStatus);
-              }
             }
           } else
             HandleMemoryFailure();
