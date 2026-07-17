@@ -278,7 +278,7 @@ account-hub-sync-accounts-failure = { -brand-short-name } was unable to connect 
 
 account-hub-email-added-success = Email account connected successfully
 
-account-hub-config-test-success = Configuration settings valid
+account-hub-config-test-success = { -brand-short-name } found the correct settings and updated them.
 
 account-hub-select-all = Select all
 
@@ -311,6 +311,8 @@ account-hub-port-error-text = Port must be between 1 and 65535
 
 account-hub-username-error-text = Username is required
     .title = Username is required
+
+account-hub-manual-config-error-summary = Please resolve the following errors:
 
 account-hub-oauth-pending = Waiting for authorization in login popup…
 
@@ -553,6 +555,8 @@ account-hub-manual-config-imap-title = IMAP Settings
 
 account-hub-manual-config-pop3-title = POP3 Settings
 
+account-hub-manual-config-review-settings-title = Review updated settings
+
 account-hub-manual-config-incoming-legend = Incoming server
 
 account-hub-manual-config-outgoing-legend = Outgoing server
@@ -565,3 +569,9 @@ account-hub-protocol-imap = Sync across devices
 account-hub-protocol-microsoft = Exchange or Microsoft 365
 
 account-hub-protocol-pop3 = Download to device
+
+account-hub-oauth-unsupported-title = Additional configuration is required
+
+# Note: 'Advanced Configuration' is the text of the link/button at the bottom of the form (e.g., account-hub-exchange-type-advanced-config)
+# 'Account Settings' is the text of the menu option/tab name accessible outside Account Hub
+account-hub-oauth-unsupported-description = { -brand-short-name } can’t automatically configure OAuth2 for this hostname. Select Advanced Configuration to create the account, then complete setup from Account Settings. <a data-l10n-name="oauth-support-link">Get help with OAuth2 setup.</a>

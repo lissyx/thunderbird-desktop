@@ -64,6 +64,7 @@
 #include "nsIMsgComposeService.h"
 #include "nsIMsgIdentity.h"
 #include "nsIMsgFolderNotificationService.h"
+#include "OfflineStorage.h"
 #include "prprf.h"
 #include "nsIMsgFilterCustomAction.h"
 #include "nsIMsgThread.h"
@@ -1304,16 +1305,28 @@ NS_IMETHODIMP nsImapMailFolder::Compact(nsIUrlListener* aListener,
 NS_IMETHODIMP nsImapMailFolder::MarkPendingRemoval(nsIMsgDBHdr* aHdr,
                                                    bool aMark) {
   NS_ENSURE_ARG_POINTER(aHdr);
+  // Only touch expungedBytes when the flag actually changes state. This method
+  // gets called repeatedly for the same headers (e.g. from
+  // ApplyRetentionSettings every time it runs), so unconditionally adjusting
+  // the count would let it drift far above the real reclaimable size.
+  nsAutoCString pendingRemoval;
+  aHdr->GetStringProperty("pendingRemoval", pendingRemoval);
+  bool wasMarked = !pendingRemoval.IsEmpty();
+  if (aMark == wasMarked) {
+    return NS_OK;
+  }
+
+  aHdr->SetStringProperty("pendingRemoval", aMark ? "1"_ns : ""_ns);
+
   uint32_t offlineMessageSize;
   aHdr->GetOfflineMessageSize(&offlineMessageSize);
-  aHdr->SetStringProperty("pendingRemoval", aMark ? "1"_ns : ""_ns);
-  if (!aMark) return NS_OK;
   nsresult rv = GetDatabase();
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIDBFolderInfo> dbFolderInfo;
   rv = mDatabase->GetDBFolderInfo(getter_AddRefs(dbFolderInfo));
   NS_ENSURE_SUCCESS(rv, rv);
-  return dbFolderInfo->ChangeExpungedBytes(offlineMessageSize);
+  return dbFolderInfo->ChangeExpungedBytes(
+      aMark ? (int32_t)offlineMessageSize : -(int32_t)offlineMessageSize);
 }
 
 NS_IMETHODIMP nsImapMailFolder::Expunge(nsIUrlListener* aListener,
@@ -2509,6 +2522,11 @@ NS_IMETHODIMP nsImapMailFolder::UpdateImapMailboxInfo(
   // numUnreadFromServer greater than -1.
   if (partialUIDFetch) numNewUnread = numUnreadFromServer;
 
+  SyncFlags(flagState);
+  // Syncing the flags may mark a formerly new message read, which resets the
+  // new-message count through SetBiffState(nsMsgBiffState_NoMail). Set the
+  // count only after the flags, so it survives until HeaderFetchCompleted()
+  // announces the new mail.
   // If we are performing biff for this folder, tell the
   // stand-alone biff about the new high water mark
   if (m_performingBiff && numNewUnread &&
@@ -2520,7 +2538,6 @@ NS_IMETHODIMP nsImapMailFolder::UpdateImapMailboxInfo(
       server->SetPerformingBiff(true);
     SetNumNewMessages(numNewUnread);
   }
-  SyncFlags(flagState);
   if (mDatabase && numUnreadFromServer > -1 &&
       (int32_t)(mNumUnreadMessages + m_uidsToFetch.Length()) >
           numUnreadFromServer)
@@ -2646,6 +2663,10 @@ NS_IMETHODIMP nsImapMailFolder::UpdateImapMailboxStatus(
   // If a noop occurred, we don't know the server's UNSEEN number because NOOP
   // does not return it. The next STATUS call response will provide numUnread.
   bool haveServerUnseenCount = numUnread != -1;
+  bool folderSelected;
+  nsresult rv = aSpec->GetFolderSelected(&folderSelected);
+  NS_ENSURE_SUCCESS(rv, rv);
+  bool deferredNewMailBiff = false;
 
   // If m_numServerUnseenMessages is 0, it means
   // this is the first time we've done a Status.
@@ -2677,12 +2698,27 @@ NS_IMETHODIMP nsImapMailFolder::UpdateImapMailboxStatus(
           !(mFlags & (nsMsgFolderFlags::Trash | nsMsgFolderFlags::Junk))) {
         SetHasNewMessages(true);
         SetNumNewMessages(unreadDelta);
-        SetBiffState(nsMsgBiffState_NewMail);
+        if (folderSelected) {
+          // The flags of a selected folder are already synchronized, so the
+          // new mail can be announced right away.
+          SetBiffState(nsMsgBiffState_NewMail);
+        } else {
+          // The server counts unseen messages, but only the local flags tell
+          // us which of them are actually new. A message read elsewhere while
+          // this session was offline may still be new/unread locally, so
+          // announcing new mail from the STATUS numbers alone repeats
+          // notifications the user has already received. Instead we keep the
+          // biff pending, like OnNewIdleMessages() does, and let the
+          // UpdateFolder() below announce the new mail once, after the local
+          // flags match the server again.
+          SetPerformingBiff(true);
+          deferredNewMailBiff = true;
+        }
       }
     }
     summaryChanged = true;
   }
-  SetPerformingBiff(false);
+  if (!deferredNewMailBiff) SetPerformingBiff(false);
   if (m_numServerUnseenMessages != numUnread ||
       m_numServerTotalMessages != numTotal) {
     if (numUnread > m_numServerUnseenMessages ||
@@ -2695,9 +2731,6 @@ NS_IMETHODIMP nsImapMailFolder::UpdateImapMailboxStatus(
   if (summaryChanged) {
     SummaryChanged();
     // Do UpdateFolder() below if folder not selected.
-    bool folderSelected;
-    nsresult rv = aSpec->GetFolderSelected(&folderSelected);
-    NS_ENSURE_SUCCESS(rv, rv);
     // folderSelected false means folderstatus URL caused imap STATUS to be
     // sent by an imap connection not imap SELECTed on the URL target folder.
     // folderSected true means NOOP was sent to the target folder for URL
@@ -7253,85 +7286,10 @@ nsImapMailFolder::CopyFolder(nsIMsgFolder* srcFolder, bool isMoveFolder,
     uint32_t folderFlags = 0;
     if (srcFolder) srcFolder->GetFlags(&folderFlags);
 
-    // if our source folder is a virtual folder
+    // if our source folder is a virtual folder, then it's a pure
+    // local copy.
     if (folderFlags & nsMsgFolderFlags::Virtual) {
-      nsCOMPtr<nsIMsgFolder> newMsgFolder;
-      nsAutoCString folderName;
-      srcFolder->GetName(folderName);
-
-      nsString safeFolderName16 = NS_MsgHashIfNecessary(folderName);
-      nsAutoCString safeFolderName = NS_ConvertUTF16toUTF8(safeFolderName16);
-
-      srcFolder->ForceDBClosed();
-
-      nsCOMPtr<nsIFile> oldPathFile;
-      rv = srcFolder->GetFilePath(getter_AddRefs(oldPathFile));
-      NS_ENSURE_SUCCESS(rv, rv);
-
-      nsCOMPtr<nsIFile> summaryFile;
-      GetSummaryFileLocation(oldPathFile, getter_AddRefs(summaryFile));
-
-      nsCOMPtr<nsIFile> newPathFile;
-      rv = GetFilePath(getter_AddRefs(newPathFile));
-      NS_ENSURE_SUCCESS(rv, rv);
-
-      bool isDirectory = false;
-      newPathFile->IsDirectory(&isDirectory);
-      if (!isDirectory) {
-        AddDirectorySeparator(newPathFile);
-        bool exists = false;
-        rv = newPathFile->Exists(&exists);
-        NS_ENSURE_SUCCESS(rv, rv);
-        if (!exists) {
-          rv = newPathFile->Create(nsIFile::DIRECTORY_TYPE, 0700);
-          NS_ENSURE_SUCCESS(rv, rv);
-        }
-      }
-
-      rv = CheckIfFolderExists(folderName, this, msgWindow);
-      if (NS_FAILED(rv)) return rv;
-
-      rv = summaryFile->CopyTo(newPathFile, EmptyString());
-      NS_ENSURE_SUCCESS(rv, rv);
-
-      rv = AddSubfolder(safeFolderName, getter_AddRefs(newMsgFolder));
-      NS_ENSURE_SUCCESS(rv, rv);
-
-      newMsgFolder->SetName(folderName);
-
-      uint32_t flags;
-      srcFolder->GetFlags(&flags);
-      newMsgFolder->SetFlags(flags);
-
-      NotifyFolderAdded(newMsgFolder);
-
-      // now remove the old folder
-      nsCOMPtr<nsIMsgFolder> msgParent;
-      srcFolder->GetParent(getter_AddRefs(msgParent));
-      srcFolder->SetParent(nullptr);
-      if (msgParent) {
-        // The files have already been moved, so delete storage false.
-        msgParent->PropagateDelete(srcFolder, false);
-        oldPathFile->Remove(false);  // berkeley mailbox
-        srcFolder->DeleteStorage();
-
-        nsCOMPtr<nsIFile> parentPathFile;
-        rv = msgParent->GetFilePath(getter_AddRefs(parentPathFile));
-        NS_ENSURE_SUCCESS(rv, rv);
-
-        AddDirectorySeparator(parentPathFile);
-        nsCOMPtr<nsIDirectoryEnumerator> children;
-        parentPathFile->GetDirectoryEntries(getter_AddRefs(children));
-        bool more;
-        // checks if the directory is empty or not
-        if (children && NS_SUCCEEDED(children->HasMoreElements(&more)) &&
-            !more) {
-          parentPathFile->Remove(true);
-        }
-      }
-      nsCOMPtr<nsIMsgCopyService> copyService =
-          mozilla::components::Copy::Service();
-      return copyService->NotifyCompletion(srcFolder, this, rv);
+      return LocalCopyVirtualFolder(srcFolder, this, isMoveFolder);
     }
 
     // non-virtual folder

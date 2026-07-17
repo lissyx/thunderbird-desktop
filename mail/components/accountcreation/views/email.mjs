@@ -431,6 +431,7 @@ class AccountHubEmail extends HTMLElement {
     );
     this.#emailIncomingConfigSubview.addEventListener("config-updated", this);
     this.#emailOutgoingConfigSubview.addEventListener("config-updated", this);
+    this.#emailManualConfigSubview.addEventListener("config-updated", this);
     this.#emailPasswordSubview.addEventListener("config-updated", this);
     this.#emailConfigFoundSubview.addEventListener("edit-configuration", this);
     this.#emailConfigFoundSubview.addEventListener("config-updated", this);
@@ -1175,6 +1176,30 @@ class AccountHubEmail extends HTMLElement {
         this.#currentConfig.incoming.type = stateData.protocolSelect;
         await this.#initManualConfig(stateData.protocolSelect);
         break;
+      case "manualConfigSubview":
+        if (!(await this.#currentSubview.validate())) {
+          this.#emailFooter.toggleForwardDisabled(true);
+          break;
+        }
+
+        stateData = this.#currentSubview.captureState();
+        if (!(await this.#testManualConfig(stateData))) {
+          break;
+        }
+
+        // #validateAccountConfig can move the flow to emailPasswordSubview
+        // when credentials are still needed. If it doesn't, account creation
+        // already completed and we can continue to sync account discovery.
+        if (!(await this.#validateAccountConfig(this.#currentConfig))) {
+          break;
+        }
+
+        // If we are not in the password subview, that means the account
+        // has been created and we can fetch the sync accounts.
+        if (this.#currentState != "emailPasswordSubview") {
+          await this.#fetchSyncAccounts();
+        }
+        break;
       case "exchangeTypeSubview":
         if (!(await this.#validateAccountConfig(stateData))) {
           break;
@@ -1607,6 +1632,105 @@ class AccountHubEmail extends HTMLElement {
     } finally {
       this.abortable = null;
     }
+  }
+
+  /**
+   * Test the combined incoming/outgoing manual configuration and reflect any
+   * updated settings in the form.
+   *
+   * @param {AccountConfig} stateData - The manual configuration to test.
+   * @returns {Promise<boolean>} Whether the flow can continue.
+   */
+  async #testManualConfig(stateData) {
+    this.#startLoading("account-hub-adding-account-subheader");
+
+    try {
+      const previousConfig = this.#currentConfig?.copy();
+      const submittedConfig = this.#fillAccountConfig(stateData);
+      const config = await this.#guessConfig(
+        this.#email.split("@")[1],
+        submittedConfig.copy()
+      );
+      config.validateSocketType();
+
+      if (this.#currentConfig?.hasPassword()) {
+        config.incoming.password = this.#currentConfig.incoming.password;
+        config.outgoing.password = this.#currentConfig.outgoing.password;
+      }
+
+      this.#currentConfig = this.#fillAccountConfig(config);
+      this.#stopLoading();
+      this.#currentSubview.setState(this.#currentConfig);
+
+      if (this.#currentConfig.isComplete()) {
+        if (
+          (previousConfig &&
+            this.#manualConfigFieldsChanged(previousConfig, submittedConfig)) ||
+          this.#manualConfigFieldsChanged(submittedConfig, this.#currentConfig)
+        ) {
+          this.#currentSubview.setTitle(
+            "account-hub-manual-config-review-settings-title"
+          );
+          this.#currentSubview.showNotification({
+            fluentTitleId: "account-hub-config-test-success",
+            type: "success",
+          });
+          this.#emailFooter.toggleForwardDisabled(false);
+          return false;
+        }
+
+        return true;
+      }
+
+      if (!(await this.#currentSubview.validate())) {
+        this.#emailFooter.toggleForwardDisabled(true);
+        return false;
+      }
+
+      this.#currentSubview.showNotification({
+        fluentTitleId: "account-hub-find-account-settings-failed",
+        type: "warning",
+      });
+      this.#emailFooter.toggleForwardDisabled(true);
+    } catch (error) {
+      this.#stopLoading();
+
+      if (
+        error instanceof UserCancelledException ||
+        error instanceof UserSkippedError
+      ) {
+        return false;
+      }
+
+      this.#currentSubview.showNotification({
+        fluentTitleId: "account-hub-find-settings-failed",
+        error,
+        type: "error",
+      });
+    }
+
+    return false;
+  }
+
+  /**
+   * Check whether any user-editable server fields differ between two configs.
+   *
+   * @param {AccountConfig} firstConfig - The first config to compare.
+   * @param {AccountConfig} secondConfig - The second config to compare.
+   * @returns {boolean} Whether any manual config fields changed.
+   */
+  #manualConfigFieldsChanged(firstConfig, secondConfig) {
+    const serverFields = {
+      incoming: ["type", "hostname", "port", "socketType", "auth", "username"],
+      outgoing: ["hostname", "port", "socketType", "auth", "username"],
+    };
+
+    return Object.entries(serverFields).some(([serverType, fields]) =>
+      fields.some(
+        field =>
+          firstConfig[serverType][field] !== secondConfig[serverType][field]
+      )
+    );
   }
 
   /**
