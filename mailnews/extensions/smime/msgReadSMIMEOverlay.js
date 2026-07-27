@@ -12,6 +12,11 @@ var gEncryptionStatus = -1;
 var gSignatureStatus = -1;
 var gSignerCert = null;
 var gEncryptionCert = null;
+var gSignatureAlgorithm = "";
+var gDigestAlgorithm = "";
+var gContentEncAlgorithm = "";
+var gContentEncKeyBits = 0;
+var gKeyEncAlgorithm = "";
 
 function showImapSignatureUnknown() {
   const readSmimeBundle = Services.strings.createBundle(
@@ -34,73 +39,67 @@ function showImapSignatureUnknown() {
 }
 
 /**
- * Populate the message security popup panel with S/MIME data.
+ * Map a signature status code to UI string keys and CSS class.
+ *
+ * @param {integer} status - A signature status from nsICMSMessageErrors.
+ * @returns {object} Object with sigInfoLabel, sigInfoHeader, sigInfo,
+ *   sigInfo_clueless, and sigClass properties.
  */
-function loadSmimeMessageSecurityInfo() {
-  const sBundle = Services.strings.createBundle(
-    "chrome://messenger-smime/locale/msgSecurityInfo.properties"
-  );
-
-  let sigInfoLabel = null;
-  let sigInfoHeader = null;
-  let sigInfo = null;
-  let sigInfo_clueless = false;
-  let sigClass = null;
-
-  switch (gSignatureStatus) {
+function smimeSignatureStatusInfo(status) {
+  switch (status) {
     case -1:
     case Ci.nsICMSMessageErrors.VERIFY_NOT_SIGNED:
-      sigInfoLabel = "SINoneLabel";
-      sigInfo = "SINone";
-      sigClass = "none";
-      break;
-
+      return {
+        sigInfoLabel: "SINoneLabel",
+        sigInfo: "SINone",
+        sigClass: "none",
+      };
     case Ci.nsICMSMessageErrors.SUCCESS:
-      sigInfoLabel = "SIValidLabel";
-      sigInfo = "SIValid";
-      sigClass = "ok";
-      break;
-
+      return {
+        sigInfoLabel: "SIValidLabel",
+        sigInfo: "SIValid",
+        sigClass: "ok",
+      };
     case Ci.nsICMSMessageErrors.VERIFY_BAD_SIGNATURE:
     case Ci.nsICMSMessageErrors.VERIFY_DIGEST_MISMATCH:
-      sigInfoLabel = "SIInvalidLabel";
-      sigInfoHeader = "SIInvalidHeader";
-      sigInfo = "SIContentAltered";
-      sigClass = "mismatch";
-      break;
-
+      return {
+        sigInfoLabel: "SIInvalidLabel",
+        sigInfoHeader: "SIInvalidHeader",
+        sigInfo: "SIContentAltered",
+        sigClass: "mismatch",
+      };
     case Ci.nsICMSMessageErrors.VERIFY_UNKNOWN_ALGO:
     case Ci.nsICMSMessageErrors.VERIFY_UNSUPPORTED_ALGO:
-      sigInfoLabel = "SIInvalidLabel";
-      sigInfoHeader = "SIInvalidHeader";
-      sigInfo = "SIInvalidCipher";
-      sigClass = "unknown";
-      break;
-
+      return {
+        sigInfoLabel: "SIInvalidLabel",
+        sigInfoHeader: "SIInvalidHeader",
+        sigInfo: "SIInvalidCipher",
+        sigClass: "unknown",
+      };
     case Ci.nsICMSMessageErrors.VERIFY_HEADER_MISMATCH:
-      sigInfoLabel = "SIPartiallyValidLabel";
-      sigInfoHeader = "SIPartiallyValidHeader";
-      sigInfo = "SIHeaderMismatch";
-      sigClass = "mismatch";
-      break;
-
+      return {
+        sigInfoLabel: "SIPartiallyValidLabel",
+        sigInfoHeader: "SIPartiallyValidHeader",
+        sigInfo: "SIHeaderMismatch",
+        sigClass: "mismatch",
+      };
     case Ci.nsICMSMessageErrors.VERIFY_CERT_WITHOUT_ADDRESS:
-      sigInfoLabel = "SIPartiallyValidLabel";
-      sigInfoHeader = "SIPartiallyValidHeader";
-      sigInfo = "SICertWithoutAddress";
-      sigClass = "unknown";
-      break;
-
+      return {
+        sigInfoLabel: "SIPartiallyValidLabel",
+        sigInfoHeader: "SIPartiallyValidHeader",
+        sigInfo: "SICertWithoutAddress",
+        sigClass: "unknown",
+      };
     case Ci.nsICMSMessageErrors.VERIFY_UNTRUSTED:
-      sigInfoLabel = "SIInvalidLabel";
-      sigInfoHeader = "SIInvalidHeader";
-      sigInfo = "SIUntrustedCA";
-      sigClass = "notok";
       // XXX Need to extend to communicate better errors
       // might also be:
       // SIExpired SIRevoked SINotYetValid SIUnknownCA SIExpiredCA SIRevokedCA SINotYetValidCA
-      break;
-
+      return {
+        sigInfoLabel: "SIInvalidLabel",
+        sigInfoHeader: "SIInvalidHeader",
+        sigInfo: "SIUntrustedCA",
+        sigClass: "notok",
+      };
     case Ci.nsICMSMessageErrors.VERIFY_NOT_YET_ATTEMPTED:
     case Ci.nsICMSMessageErrors.GENERAL_ERROR:
     case Ci.nsICMSMessageErrors.VERIFY_NO_CONTENT_INFO:
@@ -110,14 +109,28 @@ function loadSmimeMessageSecurityInfo() {
     case Ci.nsICMSMessageErrors.VERIFY_ERROR_PROCESSING:
     case Ci.nsICMSMessageErrors.VERIFY_MALFORMED_SIGNATURE:
     case Ci.nsICMSMessageErrors.VERIFY_TIME_MISMATCH:
-      sigInfoLabel = "SIInvalidLabel";
-      sigInfoHeader = "SIInvalidHeader";
-      sigInfo_clueless = true;
-      sigClass = "unverified";
-      break;
+      return {
+        sigInfoLabel: "SIInvalidLabel",
+        sigInfoHeader: "SIInvalidHeader",
+        sigInfo_clueless: true,
+        sigClass: "unverified",
+      };
     default:
-      console.error("Unexpected gSignatureStatus: " + gSignatureStatus);
+      console.error("Unexpected gSignatureStatus: " + status);
+      return {};
   }
+}
+
+/**
+ * Populate the message security popup panel with S/MIME data.
+ */
+function loadSmimeMessageSecurityInfo() {
+  const sBundle = Services.strings.createBundle(
+    "chrome://messenger-smime/locale/msgSecurityInfo.properties"
+  );
+
+  const { sigInfoLabel, sigInfoHeader, sigInfo, sigInfo_clueless, sigClass } =
+    smimeSignatureStatusInfo(gSignatureStatus);
 
   document.getElementById("techLabel").textContent = "- S/MIME";
 
@@ -198,36 +211,90 @@ function loadSmimeMessageSecurityInfo() {
   }
   document.getElementById("encryptionExplanation").textContent = str;
 
-  if (gSignerCert) {
-    document.getElementById("signatureCert").collapsed = false;
-    if (gSignerCert.subjectName) {
-      document.getElementById("signedBy").textContent = gSignerCert.commonName;
-    }
-    if (gSignerCert.emailAddress) {
-      document.getElementById("signerEmail").textContent =
-        gSignerCert.emailAddress;
-    }
-    if (gSignerCert.issuerName) {
-      document.getElementById("sigCertIssuedBy").textContent =
-        gSignerCert.issuerCommonName;
-    }
+  // Signer certificate details.
+  document.getElementById("signatureCert").collapsed = !gSignerCert;
+  document.getElementById("signedBy").textContent =
+    gSignerCert?.commonName || gSignerCert?.subjectName || "";
+  document.getElementById("signerEmail").textContent =
+    gSignerCert?.emailAddress || "";
+  document.getElementById("sigCertIssuedBy").textContent =
+    gSignerCert?.issuerCommonName || gSignerCert?.issuerName || "";
+
+  // Encryption certificate details.
+  document.getElementById("encryptionCert").collapsed = !gEncryptionCert;
+  document.getElementById("encryptedFor").textContent =
+    gEncryptionCert?.commonName || gEncryptionCert?.subjectName || "";
+  document.getElementById("recipientEmail").textContent =
+    gEncryptionCert?.emailAddress || "";
+  document.getElementById("encCertIssuedBy").textContent =
+    gEncryptionCert?.issuerCommonName || gEncryptionCert?.issuerName || "";
+
+  showCryptoDetails();
+}
+
+/**
+ * Populate the cryptographic details section at the bottom of the security
+ * panel, hiding the whole section (and each sub-part) when there is nothing
+ * to show. Uses globals: gSignatureAlgorithm, gDigestAlgorithm,
+ * gContentEncAlgorithm, gContentEncKeyBits, gKeyEncAlgorithm.
+ */
+function showCryptoDetails() {
+  const details = document.getElementById("cryptoDetails");
+  if (!details) {
+    return;
   }
 
-  if (gEncryptionCert) {
-    document.getElementById("encryptionCert").collapsed = false;
-    if (gEncryptionCert.subjectName) {
-      document.getElementById("encryptedFor").textContent =
-        gEncryptionCert.commonName;
-    }
-    if (gEncryptionCert.emailAddress) {
-      document.getElementById("recipientEmail").textContent =
-        gEncryptionCert.emailAddress;
-    }
-    if (gEncryptionCert.issuerName) {
-      document.getElementById("encCertIssuedBy").textContent =
-        gEncryptionCert.issuerCommonName;
-    }
+  // Signature algorithm details.
+  const haveSig = !!(gSignatureAlgorithm || gDigestAlgorithm);
+  document.getElementById("signatureCryptoDetails").collapsed = !haveSig;
+  document.getElementById("sigAlgorithm").textContent = gSignatureAlgorithm;
+  document.getElementById("sigDigestAlgorithm").textContent = gDigestAlgorithm;
+
+  // Encryption algorithm details.
+  const haveEnc = !!(gContentEncAlgorithm || gKeyEncAlgorithm);
+  document.getElementById("encryptionCryptoDetails").collapsed = !haveEnc;
+  const encAlgEl = document.getElementById("encAlgorithm");
+  encAlgEl.removeAttribute("data-l10n-id");
+  encAlgEl.removeAttribute("data-l10n-args");
+  if (gContentEncKeyBits > 0 && gContentEncAlgorithm) {
+    encAlgEl.textContent = "";
+    document.l10n.setAttributes(encAlgEl, "smime-crypto-cipher-with-key-size", {
+      algorithm: gContentEncAlgorithm,
+      keySize: gContentEncKeyBits,
+    });
+  } else {
+    encAlgEl.textContent = gContentEncAlgorithm;
   }
+  document.getElementById("keyEncAlgorithm").textContent = gKeyEncAlgorithm;
+
+  // Hide the whole section when empty, and always start collapsed.
+  details.hidden = !haveSig && !haveEnc;
+  details.open = false;
+}
+
+/**
+ * Empty and hide the cryptographic details section. Called when switching to
+ * a new message so no stale algorithm information remains on screen.
+ */
+function clearCryptoDetails() {
+  const details = document.getElementById("cryptoDetails");
+  if (!details) {
+    return;
+  }
+
+  document.getElementById("signatureCryptoDetails").collapsed = true;
+  document.getElementById("sigAlgorithm").textContent = "";
+  document.getElementById("sigDigestAlgorithm").textContent = "";
+
+  document.getElementById("encryptionCryptoDetails").collapsed = true;
+  const encAlgEl = document.getElementById("encAlgorithm");
+  encAlgEl.removeAttribute("data-l10n-id");
+  encAlgEl.removeAttribute("data-l10n-args");
+  encAlgEl.textContent = "";
+  document.getElementById("keyEncAlgorithm").textContent = "";
+
+  details.hidden = true;
+  details.open = false;
 }
 
 /**

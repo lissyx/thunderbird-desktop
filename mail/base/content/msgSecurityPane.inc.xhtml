@@ -134,6 +134,34 @@
           <label id="otherLabel" class="message-security-label none"/>
           <vbox id="otherEncryptionKeysList"/>
         </vbox>
+
+        <html:details id="cryptoDetails" class="crypto-details" hidden="hidden">
+          <html:summary data-l10n-id="smime-crypto-details-summary"></html:summary>
+          <vbox id="signatureCryptoDetails" collapsed="collapsed">
+            <hbox>
+              <label class="cert-label"
+                     data-l10n-id="smime-crypto-signature-algorithm" />
+              <description id="sigAlgorithm" />
+            </hbox>
+            <hbox>
+              <label class="cert-label"
+                     data-l10n-id="smime-crypto-digest-algorithm" />
+              <description id="sigDigestAlgorithm" />
+            </hbox>
+          </vbox>
+          <vbox id="encryptionCryptoDetails" collapsed="collapsed">
+            <hbox>
+              <label class="cert-label"
+                     data-l10n-id="smime-crypto-cipher" />
+              <description id="encAlgorithm" />
+            </hbox>
+            <hbox>
+              <label class="cert-label"
+                     data-l10n-id="smime-crypto-key-encryption" />
+              <description id="keyEncAlgorithm" />
+            </hbox>
+          </vbox>
+        </html:details>
       </vbox>
     </vbox>
   </panel>

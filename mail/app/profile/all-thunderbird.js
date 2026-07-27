@@ -232,6 +232,10 @@ pref("extensions.startupScanScopes", 4);
 pref("extensions.update.requireBuiltInCerts", false);
 pref("extensions.install.requireBuiltInCerts", false);
 
+// Disable the Rust password storage backend until Thunderbird compatibility
+// issues are resolved. See bug 2053724.
+pref("signon.storage.rust.enabled", false);
+
 // Allow experiments and suppress unsigned warnings.
 pref("extensions.experiments.enabled", true);
 pref("extensions.ui.disableUnsignedWarnings", true);
@@ -1553,6 +1557,9 @@ pref("mail.accounthub.thundermail.enabled", true);
 
 // Enable new manual config ui in account hub.
 pref("mail.accounthub.manualconfig.enabled", false);
+
+// Export to mobile enabled.
+pref("mail.qrexport.enabled", true);
 
 // Export to mobile logging level.
 pref("mail.qrexport.loglevel", "Warn");

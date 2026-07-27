@@ -14,9 +14,13 @@ const { InputSanitizer } = ChromeUtils.importESModule(
   "resource:///modules/accountcreation/InputSanitizer.sys.mjs"
 );
 
+const { OAuth2Providers } = ChromeUtils.importESModule(
+  "resource:///modules/OAuth2Providers.sys.mjs"
+);
+
 const CONFIG_CHANGE_INPUT_DEBOUNCE_MS = 100;
 
-const { assert } = AccountCreationUtils;
+const { assert, gAccountSetupLogger, standardPorts } = AccountCreationUtils;
 
 import { AccountHubStep } from "./account-hub-step.mjs";
 import "./account-hub-select.mjs"; // eslint-disable-line import/no-unassigned-import
@@ -181,13 +185,18 @@ class EmailManualConfigForm extends AccountHubStep {
   handleEvent(event) {
     switch (event.type) {
       case "input":
-        this.#queueConfigChange();
+        this.#queueConfigChange(event.currentTarget);
         break;
       case "change":
+        this.#runConfigChanged();
         if (event.currentTarget == this.#sameUsernameCheckbox) {
           this.#hideOutgoingUsername(this.#sameUsernameCheckbox.checked);
         }
-        this.#runConfigChanged();
+        if (event.currentTarget === this.#incomingConnectionSecurity) {
+          this.#adjustPortToSSLAndProtocol(this.#currentConfig, true);
+        } else if (event.currentTarget === this.#outgoingConnectionSecurity) {
+          this.#adjustPortToSSLAndProtocol(this.#currentConfig, false);
+        }
         break;
       default:
         break;
@@ -257,6 +266,8 @@ class EmailManualConfigForm extends AccountHubStep {
    * @returns {Promise<boolean>} Whether the form is valid.
    */
   async validate() {
+    this.#adjustOAuthToHostname(this.#currentConfig, true);
+    this.#adjustOAuthToHostname(this.#currentConfig, false);
     this.#clearQueuedConfigChange();
     const errors = this.#captureConfig({ showErrors: true });
     this.#isShowingErrors = !!errors.length;
@@ -268,6 +279,22 @@ class EmailManualConfigForm extends AccountHubStep {
 
     await this.#showFieldErrorNotification(errors);
     return false;
+  }
+
+  /**
+   * The inputs that can show validation errors.
+   *
+   * @returns {AccountHubInput[]}
+   */
+  get #validatedInputs() {
+    return [
+      this.#incomingHostname,
+      this.#incomingUsername,
+      this.#incomingPort,
+      this.#outgoingHostname,
+      this.#outgoingUsername,
+      this.#outgoingPort,
+    ];
   }
 
   /**
@@ -290,8 +317,7 @@ class EmailManualConfigForm extends AccountHubStep {
     if (config.incoming.port) {
       this.#incomingPort.value = config.incoming.port;
     } else {
-      // TODO: Add function for adjusting incoming port.
-      // this.#adjustPortToSSLAndProtocol(config);
+      this.#adjustPortToSSLAndProtocol(config, true);
     }
 
     this.#incomingAuthenticationMethod.value = InputSanitizer.enum(
@@ -299,10 +325,9 @@ class EmailManualConfigForm extends AccountHubStep {
       [0, 3, 4, 5, 6, 10],
       0
     );
-    this.#incomingUsername.value = config.incoming.username;
+    this.#adjustOAuthToHostname(config, true);
 
-    // TODO: Add function for adjusting incoming Oauth.
-    // this.#adjustOAuth2Visibility(config);
+    this.#incomingUsername.value = config.incoming.username;
 
     this.#outgoingHostname.value = config.outgoing.hostname;
     this.#outgoingUsername.value = config.outgoing.username;
@@ -323,33 +348,213 @@ class EmailManualConfigForm extends AccountHubStep {
       [0, 1, 3, 4, 5, 6, 10],
       0
     );
+    this.#adjustOAuthToHostname(config, false);
 
     // If a port number was specified other than "Auto".
     if (config.outgoing.port) {
       this.#outgoingPort.value = config.outgoing.port;
     } else {
-      // TODO: Add function for adjusting outgoing port.
-      // this.#adjustPortToSSLAndProtocol(config);
+      this.#adjustPortToSSLAndProtocol(config, false);
     }
-
-    // TODO: Add function for adjusting outgoing OAuth
-    // this.#adjustOAuth2Visibility(config);
   }
 
   /**
-   * The inputs that can show validation errors.
+   * Automatically fill port field when connection security has changed in,
+   * unless the user entered a non-standard port.
    *
-   * @returns {AccountHubInput[]}
+   * @param {AccountConfig} [accountConfig] - Complete AccountConfig.
+   * @param {boolean} isIncoming - If port to be adjusted is incoming.
    */
-  get #validatedInputs() {
-    return [
-      this.#incomingHostname,
-      this.#incomingUsername,
-      this.#incomingPort,
-      this.#outgoingHostname,
-      this.#outgoingUsername,
-      this.#outgoingPort,
-    ];
+  #adjustPortToSSLAndProtocol(accountConfig, isIncoming = false) {
+    // Get current config.
+    const config = accountConfig || this.#currentConfig;
+    const socketType = isIncoming
+      ? config.incoming.socketType
+      : config.outgoing.socketType;
+    const plainSecurity = socketType == Ci.nsMsgSocketType.plain;
+    const connectionSecurityInput = isIncoming
+      ? this.#incomingConnectionSecurity
+      : this.#outgoingConnectionSecurity;
+
+    // If connection security chosen is none, show insecure connection warning.
+    connectionSecurityInput.toggleAttribute("warning", plainSecurity);
+
+    if (isIncoming) {
+      if (
+        config.incoming.port &&
+        !standardPorts.includes(config.incoming.port)
+      ) {
+        return;
+      }
+
+      switch (config.incoming.type) {
+        case "imap":
+          this.#incomingPort.value =
+            socketType == Ci.nsMsgSocketType.SSL ? 993 : 143;
+          break;
+
+        case "pop3":
+          this.#incomingPort.value =
+            socketType == Ci.nsMsgSocketType.SSL ? 995 : 110;
+          break;
+      }
+
+      config.incoming.port = this.#incomingPort.valueAsNumber;
+      this.#currentConfig = config;
+      return;
+    }
+
+    if (config.outgoing.port && !standardPorts.includes(config.outgoing.port)) {
+      return;
+    }
+
+    // Implicit TLS for SMTP is on port 465.
+    if (socketType == Ci.nsMsgSocketType.SSL) {
+      this.#outgoingPort.value = 465;
+    } else if (
+      (config.outgoing.port == 465 || !config.outgoing.port) &&
+      socketType == Ci.nsMsgSocketType.alwaysSTARTTLS
+    ) {
+      // Implicit TLS for SMTP is on port 465. STARTTLS won't work there.
+      this.#outgoingPort.value = 587;
+    }
+
+    config.outgoing.port = this.#outgoingPort.valueAsNumber;
+    this.#currentConfig = config;
+  }
+
+  /**
+   * If the user changed the incoming port manually, adjust the SSL value,
+   * (only) if the new port is impossible with the old SSL value.
+   *
+   * @param {AccountConfig} [accountConfig] - Complete AccountConfig.
+   */
+  #adjustIncomingSSLToPort(accountConfig) {
+    const config = accountConfig || this.#currentConfig;
+
+    if (!standardPorts.includes(config.incoming.port)) {
+      return;
+    }
+
+    if (config.incoming.type == "imap") {
+      // Implicit TLS for IMAP is on port 993.
+      if (
+        config.incoming.port == 993 &&
+        config.incoming.socketType != Ci.nsMsgSocketType.SSL
+      ) {
+        this.#incomingConnectionSecurity.value = Ci.nsMsgSocketType.SSL;
+      } else if (
+        config.incoming.port == 143 &&
+        config.incoming.socketType == Ci.nsMsgSocketType.SSL
+      ) {
+        this.#incomingConnectionSecurity.value =
+          Ci.nsMsgSocketType.alwaysSTARTTLS;
+      }
+    }
+
+    if (config.incoming.type == "pop3") {
+      // Implicit TLS for POP3 is on port 995.
+      if (
+        config.incoming.port == 995 &&
+        config.incoming.socketType != Ci.nsMsgSocketType.SSL
+      ) {
+        this.#incomingConnectionSecurity.value = Ci.nsMsgSocketType.SSL;
+      } else if (
+        config.incoming.port == 110 &&
+        config.incoming.socketType == Ci.nsMsgSocketType.SSL
+      ) {
+        this.#incomingConnectionSecurity.value =
+          Ci.nsMsgSocketType.alwaysSTARTTLS;
+      }
+    }
+
+    config.incoming.socketType = this.#incomingConnectionSecurity.value;
+
+    this.#currentConfig = config;
+  }
+
+  /**
+   * If the user changed the outgoing port manually, adjust the SSL value,
+   * (only) if the new port is impossible with the old SSL value.
+   *
+   * @param {AccountConfig} [accountConfig] - Complete AccountConfig.
+   */
+  #adjustOutgoingSSLToPort(accountConfig) {
+    const config = accountConfig || this.#currentConfig;
+
+    if (!standardPorts.includes(config.outgoing.port)) {
+      return;
+    }
+
+    if (
+      config.outgoing.port == 465 &&
+      config.outgoing.socketType != Ci.nsMsgSocketType.SSL
+    ) {
+      this.#outgoingConnectionSecurity.value = Ci.nsMsgSocketType.SSL;
+    } else if (
+      (config.outgoing.port == 587 || config.outgoing.port == 25) &&
+      config.outgoing.socketType == Ci.nsMsgSocketType.SSL
+    ) {
+      // Port 587 and port 25 are for plain or STARTTLS. Not for Implicit TLS.
+      this.#outgoingConnectionSecurity.value =
+        Ci.nsMsgSocketType.alwaysSTARTTLS;
+    }
+
+    config.outgoing.socketType = this.#outgoingConnectionSecurity.value;
+    this.#currentConfig = config;
+  }
+
+  /**
+   * Automatically adjust visibility of OAuth auth option and selected
+   * authentication for incoming and outgoing configurations based on
+   * hostname input.
+   *
+   * @param {AccountConfig} [accountConfig] - Complete AccountConfig.
+   * @param {boolean} isIncoming - If hostname is incoming.
+   */
+  #adjustOAuthToHostname(accountConfig, isIncoming) {
+    const config = accountConfig || this.#currentConfig;
+    let oauthDetails = undefined;
+    const protocol = isIncoming
+      ? config.incoming.type
+      : config.outgoing.type || "smtp";
+    const hostname = isIncoming
+      ? this.#incomingHostname.value
+      : this.#outgoingHostname.value;
+    const authenticationMethodSelect = isIncoming
+      ? this.#incomingAuthenticationMethod
+      : this.#outgoingAuthenticationMethod;
+    const oauthOption = isIncoming
+      ? this.querySelector("#manualIncomingAuthMethodOAuth2")
+      : this.querySelector("#manualOutgoingAuthMethodOAuth2");
+
+    try {
+      const host = InputSanitizer.hostname(hostname);
+      oauthDetails = OAuth2Providers.getHostnameDetails(host, protocol);
+      oauthOption.hidden = !oauthDetails;
+      gAccountSetupLogger.debug(
+        `OAuth2 details for server ${hostname} is,,
+        ${oauthDetails}`
+      );
+    } catch (error) {
+      oauthDetails = undefined;
+      oauthOption.hidden = true;
+    }
+
+    if (
+      !oauthDetails &&
+      authenticationMethodSelect.value == Ci.nsMsgAuthMethod.OAuth2
+    ) {
+      // If the hostname determined OAuth is not an option and its selected,
+      // reset the authentication option to "Normal Password".
+      authenticationMethodSelect.value = Ci.nsMsgAuthMethod.passwordCleartext;
+      const configDirection = isIncoming ? "incoming" : "outgoing";
+      config[configDirection].auth = InputSanitizer.integer(
+        authenticationMethodSelect.value
+      );
+    }
+
+    this.#currentConfig = config;
   }
 
   /**
@@ -491,13 +696,36 @@ class EmailManualConfigForm extends AccountHubStep {
 
   /**
    * Queue a config update after the user stops typing.
+   *
+   * @param {HTMLElement} currentTarget - The element that triggered the config
+   *  change.
    */
-  #queueConfigChange() {
+  #queueConfigChange(currentTarget) {
     this.#clearQueuedConfigChange();
     this.#configChangeTimer = this.ownerDocument.documentGlobal.setTimeout(
       () => {
         this.#configChangeTimer = null;
-        this.#runConfigChanged();
+        switch (currentTarget) {
+          case this.#incomingPort:
+            this.#runConfigChanged();
+            this.#adjustIncomingSSLToPort();
+            break;
+          case this.#outgoingPort:
+            this.#runConfigChanged();
+            this.#adjustOutgoingSSLToPort();
+            break;
+          case this.#incomingHostname:
+            this.#adjustOAuthToHostname(this.#currentConfig, true);
+            this.#runConfigChanged();
+            break;
+          case this.#outgoingHostname:
+            this.#adjustOAuthToHostname(this.#currentConfig, false);
+            this.#runConfigChanged();
+            break;
+          default:
+            this.#runConfigChanged();
+            break;
+        }
       },
       CONFIG_CHANGE_INPUT_DEBOUNCE_MS
     );

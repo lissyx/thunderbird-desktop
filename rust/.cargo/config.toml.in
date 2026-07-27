@@ -16,9 +16,9 @@ git = "https://github.com/franziskuskiefer/cose-rust"
 rev = "43c22248d136c8b38fe42ea709d08da6355cf04b"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/gfx-rs/wgpu?rev=48904f8e769a9b1ef146032a4fc94c53a1e02e00"]
+[source."git+https://github.com/gfx-rs/wgpu?rev=f680a2c242ce109d632b1154d72e0e7836e31c67"]
 git = "https://github.com/gfx-rs/wgpu"
-rev = "48904f8e769a9b1ef146032a4fc94c53a1e02e00"
+rev = "f680a2c242ce109d632b1154d72e0e7836e31c67"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/glandium/allocator-api2?rev=ad5f3d56a5a4519eff52af4ff85293431466ef5c"]
@@ -111,14 +111,14 @@ git = "https://github.com/mozilla/mls-platform-api"
 rev = "2a2e344019bfc76b7e566ee6e0549cf668d90127"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/mp4parse-rust?rev=b693c7e4a91d1d5a391c0404d18b6fc94714894e"]
+[source."git+https://github.com/mozilla/mp4parse-rust?rev=8a49a0769764152022bf14a8253bcde1971a75df"]
 git = "https://github.com/mozilla/mp4parse-rust"
-rev = "b693c7e4a91d1d5a391c0404d18b6fc94714894e"
+rev = "8a49a0769764152022bf14a8253bcde1971a75df"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/neqo?tag=v0.29.0"]
+[source."git+https://github.com/mozilla/neqo?tag=v0.30.1"]
 git = "https://github.com/mozilla/neqo"
-tag = "v0.29.0"
+tag = "v0.30.1"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/mozilla/nss-rs"]

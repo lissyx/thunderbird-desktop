@@ -410,6 +410,378 @@ add_task(async function test_validateShowsClickableErrorSummary() {
   }
 });
 
+add_task(async function test_adjustSSLToPort() {
+  const incomingPort = subview.querySelector("#manualIncomingPort");
+  const incomingConnectionSecurity = subview.querySelector(
+    "#manualIncomingConnectionSecurity"
+  );
+  const outgoingPort = subview.querySelector("#manualOutgoingPort");
+  const outgoingConnectionSecurity = subview.querySelector(
+    "#manualOutgoingConnectionSecurity"
+  );
+
+  const config = new AccountConfig();
+
+  // IMAP Testing.
+  config.incoming.type = "imap";
+  subview.setState(config);
+
+  Assert.notEqual(
+    incomingConnectionSecurity.value,
+    Ci.nsMsgSocketType.SSL,
+    "Incoming socket should not be SSL when the state is set"
+  );
+
+  await fireInputEvent(incomingPort, "input", 993);
+  Assert.equal(
+    incomingConnectionSecurity.value,
+    Ci.nsMsgSocketType.SSL,
+    "Incoming socket should be SSL"
+  );
+
+  await fireInputEvent(incomingPort, "input", 143);
+  Assert.equal(
+    incomingConnectionSecurity.value,
+    Ci.nsMsgSocketType.alwaysSTARTTLS,
+    "Incoming socket be STARTTLS"
+  );
+
+  // POP3 Testing.
+  config.incoming.type = "pop3";
+  subview.setState(config);
+
+  await fireInputEvent(incomingPort, "input", 995);
+  Assert.equal(
+    incomingConnectionSecurity.value,
+    Ci.nsMsgSocketType.SSL,
+    "Incoming socket should be SSL"
+  );
+
+  await fireInputEvent(incomingPort, "input", 110);
+  Assert.equal(
+    incomingConnectionSecurity.value,
+    Ci.nsMsgSocketType.alwaysSTARTTLS,
+    "Incoming socket should be STARTTLS"
+  );
+
+  // Outgoing testing.
+  Assert.notEqual(
+    incomingConnectionSecurity.value,
+    Ci.nsMsgSocketType.SSL,
+    "Outgoing socket should not be SSL when the state is set"
+  );
+
+  await fireInputEvent(outgoingPort, "input", 465);
+  Assert.equal(
+    outgoingConnectionSecurity.value,
+    Ci.nsMsgSocketType.SSL,
+    "Outgoing socket should be SSL"
+  );
+
+  await fireInputEvent(outgoingPort, "input", 587);
+  Assert.equal(
+    outgoingConnectionSecurity.value,
+    Ci.nsMsgSocketType.alwaysSTARTTLS,
+    "Outgoing socket should be STARTTLS"
+  );
+
+  subview.resetState();
+});
+
+add_task(async function test_adjustPortToSSLAndProtocol() {
+  const incomingPort = subview.querySelector("#manualIncomingPort");
+  const incomingConnectionSecurity = subview.querySelector(
+    "#manualIncomingConnectionSecurity"
+  );
+  const outgoingPort = subview.querySelector("#manualOutgoingPort");
+  const outgoingConnectionSecurity = subview.querySelector(
+    "#manualOutgoingConnectionSecurity"
+  );
+
+  const config = new AccountConfig();
+  config.incoming.type = "imap";
+  subview.setState(config);
+
+  await fireInputEvent(
+    incomingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.SSL
+  );
+  Assert.equal(
+    incomingPort.value,
+    993,
+    "Incoming port value should match SSL connection security"
+  );
+
+  await fireInputEvent(
+    incomingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.alwaysSTARTTLS
+  );
+  Assert.equal(
+    incomingPort.value,
+    143,
+    "Incoming port value should match STARTTLS connection security"
+  );
+
+  config.incoming.type = "pop3";
+  subview.setState(config);
+
+  await fireInputEvent(
+    incomingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.SSL
+  );
+  Assert.equal(
+    incomingPort.value,
+    995,
+    "Incoming port value should match SSL connection security"
+  );
+
+  await fireInputEvent(
+    incomingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.alwaysSTARTTLS
+  );
+  Assert.equal(
+    incomingPort.value,
+    110,
+    "Incoming port value should match STARTTLS connection security"
+  );
+
+  await fireInputEvent(
+    outgoingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.SSL
+  );
+  Assert.equal(
+    outgoingPort.value,
+    465,
+    "Outgoing port value should match SSL connection security"
+  );
+
+  await fireInputEvent(
+    outgoingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.alwaysSTARTTLS
+  );
+  Assert.equal(
+    outgoingPort.value,
+    587,
+    "Outgoing port value should match SSL connection security"
+  );
+
+  subview.resetState();
+});
+
+add_task(async function test_showPlainSecurityError() {
+  const incomingConnectionSecurity = subview.querySelector(
+    "#manualIncomingConnectionSecurity"
+  );
+  const outgoingConnectionSecurity = subview.querySelector(
+    "#manualOutgoingConnectionSecurity"
+  );
+
+  const config = new AccountConfig();
+  subview.setState(config);
+
+  await fireInputEvent(
+    incomingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.plain
+  );
+
+  await fireInputEvent(
+    outgoingConnectionSecurity,
+    "change",
+    Ci.nsMsgSocketType.plain
+  );
+
+  Assert.ok(
+    incomingConnectionSecurity.hasAttribute("warning"),
+    "Incoming socket should have warning label"
+  );
+  Assert.ok(
+    outgoingConnectionSecurity.hasAttribute("warning"),
+    "Outgoing socket should have warning label"
+  );
+
+  subview.resetState();
+});
+
+add_task(async function test_adjustIncomingOAuthToHostname() {
+  const hostname = subview.querySelector("#manualIncomingHostname");
+  const authMethod = subview.querySelector("#manualIncomingAuthMethod");
+
+  const config = new AccountConfig();
+
+  const incomingTypes = ["imap", "pop3"];
+
+  for (const type of incomingTypes) {
+    // Protocol type testing.
+    config.incoming.type = type;
+    subview.setState(config);
+
+    Assert.ok(
+      subview.querySelector("#manualIncomingAuthMethodOAuth2").hidden,
+      "The incoming OAuth authentication method option should be hidden"
+    );
+
+    // Add a hostname that lets OAuth be available.
+    await fireInputEvent(hostname, "input", `${type}.gmail.com`);
+    Assert.ok(
+      !subview.querySelector("#manualIncomingAuthMethodOAuth2").hidden,
+      "The incoming OAuth authentication method option should be available"
+    );
+    Assert.ok(
+      subview.querySelector("#manualOutgoingAuthMethodOAuth2").hidden,
+      "The outgoing OAuth authentication method option should be hidden"
+    );
+
+    info("Select OAuth");
+    await SimpleTest.promiseFocus(browser.contentWindow);
+
+    let configUpdatedEventPromise = BrowserTestUtils.waitForEvent(
+      subview,
+      "config-updated"
+    );
+    const authSelectorMethodPromise =
+      BrowserTestUtils.waitForSelectPopupShown(window);
+    EventUtils.synthesizeMouseAtCenter(authMethod, {}, browser.contentWindow);
+
+    const authMethodSelectorPopup = await authSelectorMethodPromise;
+    const authMethodSelectorItems =
+      authMethodSelectorPopup.querySelectorAll("menuitem");
+
+    // #incomingAuthMethodOAuth2.
+    authMethodSelectorPopup.activateItem(authMethodSelectorItems[5]);
+    await BrowserTestUtils.waitForPopupEvent(authMethodSelectorPopup, "hidden");
+    await configUpdatedEventPromise;
+    Assert.equal(
+      authMethod.value,
+      Ci.nsMsgAuthMethod.OAuth2,
+      "The auth method should be set as OAuth2"
+    );
+
+    // Change the hostname so OAuth shouldn't be available, and check that the
+    // authentication method is changed to "Normal Password".
+    configUpdatedEventPromise = BrowserTestUtils.waitForEvent(
+      subview,
+      "config-updated"
+    );
+    await fireInputEvent(hostname, "input", "example.com");
+    await configUpdatedEventPromise;
+    Assert.equal(
+      authMethod.value,
+      Ci.nsMsgAuthMethod.passwordCleartext,
+      "The auth method should be set as Normal Password"
+    );
+    Assert.ok(
+      subview.querySelector("#manualIncomingAuthMethodOAuth2").hidden,
+      "The incoming OAuth authentication method option should be hidden"
+    );
+
+    subview.resetState();
+  }
+});
+
+add_task(async function test_adjustOutgoingOAuthToHostname() {
+  const hostname = subview.querySelector("#manualOutgoingHostname");
+  const authMethod = subview.querySelector("#manualOutgoingAuthMethod");
+
+  const config = new AccountConfig();
+
+  // SMTP Testing.
+  config.outgoing.type = "smtp";
+  subview.setState(config);
+
+  Assert.ok(
+    subview.querySelector("#manualOutgoingAuthMethodOAuth2").hidden,
+    "The outgoing OAuth authentication method option should be hidden"
+  );
+
+  // Add a hostname that lets OAuth be available.
+  await fireInputEvent(hostname, "input", "smtp.gmail.com");
+  Assert.ok(
+    !subview.querySelector("#manualOutgoingAuthMethodOAuth2").hidden,
+    "The outgoing OAuth authentication method option should be available"
+  );
+  Assert.ok(
+    subview.querySelector("#manualIncomingAuthMethodOAuth2").hidden,
+    "The incoming OAuth authentication method option should be hidden"
+  );
+
+  info("Select OAuth");
+  authMethod.scrollIntoView({
+    block: "start",
+    behavior: "instant",
+  });
+
+  let configUpdatedEventPromise = BrowserTestUtils.waitForEvent(
+    subview,
+    "config-updated"
+  );
+  await SimpleTest.promiseFocus(browser.contentWindow);
+
+  const authSelectorMethodPromise =
+    BrowserTestUtils.waitForSelectPopupShown(window);
+  EventUtils.synthesizeMouseAtCenter(authMethod, {}, browser.contentWindow);
+
+  const authMethodSelectorPopup = await authSelectorMethodPromise;
+  const authMethodSelectorItems =
+    authMethodSelectorPopup.querySelectorAll("menuitem");
+
+  // #outgoingAuthMethodOAuth2.
+  authMethodSelectorPopup.activateItem(authMethodSelectorItems[6]);
+  await BrowserTestUtils.waitForPopupEvent(authMethodSelectorPopup, "hidden");
+  await configUpdatedEventPromise;
+
+  Assert.equal(
+    authMethod.value,
+    Ci.nsMsgAuthMethod.OAuth2,
+    "The auth method should be set as OAuth2"
+  );
+
+  // Change the hostname so OAuth shouldn't be available, and check that the
+  // authentication method is changed to "Normal Password".
+  configUpdatedEventPromise = BrowserTestUtils.waitForEvent(
+    subview,
+    "config-updated"
+  );
+  await fireInputEvent(hostname, "input", "example.com");
+  await configUpdatedEventPromise;
+  Assert.equal(
+    authMethod.value,
+    Ci.nsMsgAuthMethod.passwordCleartext,
+    "The auth method should be set as Normal Password"
+  );
+  Assert.ok(
+    subview.querySelector("#manualOutgoingAuthMethodOAuth2").hidden,
+    "The outgoing OAuth authentication method option should be hidden"
+  );
+
+  subview.resetState();
+});
+
+/**
+ * Sets value of input and fires event supplied in parameter.
+ *
+ * @param {HTMLInputElement} input - The input to be updated.
+ * @param {string} eventName - Type of event to be fired.
+ * @param {number} value - Value to be applied to input.
+ */
+async function fireInputEvent(input, eventName, value) {
+  input.value = value;
+  input.dispatchEvent(new Event(eventName, { bubbles: true }));
+
+  // Timeout needed because there is a debounce on the config change
+  // when typing.
+  if (eventName === "input") {
+    // eslint-disable-next-line mozilla/no-arbitrary-setTimeout
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
 /**
  * Returns a filled imap AccountConfig object.
  *
