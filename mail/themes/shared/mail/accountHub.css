@@ -53,6 +53,10 @@ dialog {
   --hub-close-button-focus-background: var(--color-surface-subtle);
   --hub-close-button-focus-outline-color: var(--color-surface-border-intense);
 
+  --hub-space-small: calc(var(--space-step) * 2);
+  --hub-space-medium: calc(var(--space-step) * 3);
+  --hub-space-large: calc(var(--space-step) * 4);
+
   --success-illustration: var(--hub-success-illustration);
   /* TODO: apply dark mode styling */
 }
@@ -408,6 +412,13 @@ header {
 
 /* Body */
 
+.manual-config-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  block-size: 100%;
+}
+
 .hub-body {
   display: flex;
   flex-direction: column;
@@ -617,7 +628,7 @@ header {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
+  gap: calc(4 * var(--space-step));
   margin: 0;
   padding: 0;
   border: 0;
@@ -631,6 +642,7 @@ header {
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0, 1, 2, 0.1);
   border-radius: 8px;
+  user-select: none;
 
   &:has(input:checked) {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.14);
@@ -638,8 +650,13 @@ header {
 
   & input[type="radio"] {
     position: absolute;
+    inset: 0;
+    z-index: 1;
+    inline-size: 100%;
+    block-size: 100%;
+    margin: 0;
     opacity: 0;
-    pointer-events: none;
+    cursor: pointer;
   }
 
   & .account-hub-protocol-select-card-content {
@@ -650,14 +667,16 @@ header {
     overflow: hidden;
     border: 1px solid var(--color-primary-default);
     border-radius: 8px;
+    pointer-events: none;
   }
 
   & .account-hub-protocol-select-card-header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
+    justify-content: flex-end;
+    padding-block: calc(2 * var(--space-step));
+    gap: var(--space-step);
     box-sizing: border-box;
     block-size: 57px;
     border-radius: 8px 8px 0 0;
@@ -914,6 +933,22 @@ header {
       outline: var(--focus-outline);
       outline-offset: var(--focus-outline-offset);
     }
+  }
+
+  &.button-advanced-configuration {
+    display: flex;
+    /* There should be 12px between the bottom of this button, and the top of
+     * the footer buttons. We need to factor in the footer button's top margin,
+     * and the 2px top padding of the 'dialog-menu-container' class */
+    margin-block-end: calc(12px - var(--button-margin) - 2px);
+    margin-inline-start: auto;
+    /* This is needed to align the link with the footer buttons correctly. The
+     * 10px comes from menu.dialog-menu-container in inContentDialog.css  */
+    margin-inline-end: calc(var(--button-border-size) + var(--button-margin) + 10px);
+    padding: var(--hub-space-medium) var(--space-step);
+    text-decoration: underline;
+    font-weight: 500;
+    border: 0;
   }
 }
 

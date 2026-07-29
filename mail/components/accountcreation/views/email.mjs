@@ -298,6 +298,7 @@ class AccountHubEmail extends HTMLElement {
       previousStep: "exchangeSettingsSubview",
       forwardEnabled: false,
       customActionFluentID: "",
+      customForwardFluentID: "account-hub-email-connect-button",
       subview: {},
       templateId: "email-exchange-type",
     },
@@ -432,6 +433,7 @@ class AccountHubEmail extends HTMLElement {
     this.#emailIncomingConfigSubview.addEventListener("config-updated", this);
     this.#emailOutgoingConfigSubview.addEventListener("config-updated", this);
     this.#emailManualConfigSubview.addEventListener("config-updated", this);
+    this.#emailManualConfigSubview.addEventListener("advanced-config", this);
     this.#emailPasswordSubview.addEventListener("config-updated", this);
     this.#emailConfigFoundSubview.addEventListener("edit-configuration", this);
     this.#emailConfigFoundSubview.addEventListener("config-updated", this);
@@ -574,7 +576,6 @@ class AccountHubEmail extends HTMLElement {
     this.#emailManualConfigSubview.hidden = true;
     this.#emailIncomingConfigSubview.hidden = true;
     this.#emailOutgoingConfigSubview.hidden = true;
-    this.#emailManualConfigSubview.hidden = true;
     this.#exchangeSettingsSubview.hidden = true;
     this.#emailCredentialsConfirmationSubview.hidden = true;
     this.#states.emailAutodiscoverAuthenticationSubview.subview.hidden = true;
@@ -1433,7 +1434,7 @@ class AccountHubEmail extends HTMLElement {
     this.#states[this.#currentState].previousStep = previousStep;
     this.#currentSubview.setState(this.#currentConfig);
     this.#currentSubview.showNotification({
-      fluentTitleId: "account-hub-email-protocol-select-notification",
+      fluentTitleId: "account-hub-email-protocol-select-additional-info",
       type: "info",
     });
   }
@@ -1901,7 +1902,7 @@ class AccountHubEmail extends HTMLElement {
       syncAccounts.calendars = await this.#getCalendars(
         hostnames,
         this.#currentConfig.incoming.password ?? "",
-        false
+        this.#currentConfig.rememberPassword ?? false
       );
 
       // If the user hit cancel while loading, a UserSkippedError will be
