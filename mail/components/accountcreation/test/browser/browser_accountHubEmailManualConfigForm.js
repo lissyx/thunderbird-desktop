@@ -240,6 +240,196 @@ add_task(function test_setStateSetsPop3Title() {
   subview.resetState();
 });
 
+add_task(function test_setStateShowsAutomaticChangeIndicators() {
+  const previousConfig = createFilledAccountConfig();
+  previousConfig.incoming.socketType = Ci.nsMsgSocketType.SSL;
+  previousConfig.incoming.port = 993;
+  previousConfig.outgoing.username = "smtp-user";
+  previousConfig.outgoing.socketType = Ci.nsMsgSocketType.SSL;
+  previousConfig.outgoing.port = 465;
+
+  const updatedConfig = previousConfig.copy();
+  updatedConfig.incoming.socketType = Ci.nsMsgSocketType.alwaysSTARTTLS;
+  updatedConfig.incoming.port = 143;
+  updatedConfig.outgoing.port = 587;
+
+  subview.setState(updatedConfig, { previousConfig });
+
+  const incomingSecurity = subview.querySelector(
+    "#manualIncomingConnectionSecurity"
+  );
+  const incomingSecurityHelp = incomingSecurity.shadowRoot.querySelector(
+    ".account-hub-form-small-comment"
+  );
+  Assert.ok(
+    BrowserTestUtils.isVisible(incomingSecurityHelp),
+    "Incoming security should show an automatic change indicator"
+  );
+  Assert.deepEqual(
+    document.l10n.getAttributes(incomingSecurityHelp),
+    {
+      id: "account-hub-manual-config-security-changed",
+      args: {
+        oldValue: "SSL/TLS",
+        newValue: "STARTTLS",
+      },
+    },
+    "Incoming security should describe the detected change"
+  );
+
+  const incomingPort = subview.querySelector("#manualIncomingPort");
+  const incomingPortHelp = incomingPort.querySelector(
+    ".account-hub-form-small-comment"
+  );
+  Assert.ok(
+    BrowserTestUtils.isVisible(incomingPortHelp),
+    "Incoming port should show an automatic change indicator"
+  );
+  Assert.deepEqual(
+    document.l10n.getAttributes(incomingPortHelp),
+    {
+      id: "account-hub-manual-config-port-changed",
+      args: {
+        oldValue: 993,
+        newValue: 143,
+      },
+    },
+    "Incoming port should describe the detected change"
+  );
+  Assert.equal(
+    incomingPort.querySelector("input").getAttribute("aria-describedby"),
+    incomingPortHelp.id,
+    "Incoming port should be described by the automatic change indicator"
+  );
+
+  const outgoingPortHelp = subview
+    .querySelector("#manualOutgoingPort")
+    .querySelector(".account-hub-form-small-comment");
+  Assert.deepEqual(
+    document.l10n.getAttributes(outgoingPortHelp),
+    {
+      id: "account-hub-manual-config-port-changed",
+      args: {
+        oldValue: 465,
+        newValue: 587,
+      },
+    },
+    "Outgoing port should describe the detected change"
+  );
+
+  Assert.ok(
+    BrowserTestUtils.isHidden(
+      subview
+        .querySelector("#manualIncomingHostname")
+        .querySelector(".account-hub-form-small-comment")
+    ),
+    "Unchanged fields should not show automatic change indicators"
+  );
+
+  incomingPort.dispatchEvent(
+    new browser.contentWindow.Event("input", { bubbles: true })
+  );
+
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingSecurityHelp),
+    "Editing the form should clear automatic change indicators"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingPortHelp),
+    "Editing the form should clear input automatic change indicators"
+  );
+
+  subview.resetState();
+});
+
+add_task(async function test_setStateKeepsInvalidFieldsNeutralUntilTouched() {
+  const state = createFilledAccountConfig();
+  state.incoming.hostname = "bad host";
+  state.incoming.username = "";
+  state.incoming.port = 70000;
+  subview.setState(state);
+
+  await new Promise(browser.contentWindow.requestAnimationFrame);
+
+  const incomingHostname = subview.querySelector("#manualIncomingHostname");
+  const incomingUsername = subview.querySelector("#manualIncomingUsername");
+  const incomingPort = subview.querySelector("#manualIncomingPort");
+  const outgoingHostname = subview.querySelector("#manualOutgoingHostname");
+
+  Assert.ok(
+    BrowserTestUtils.isVisible(
+      outgoingHostname.querySelector(".input-success")
+    ),
+    "A valid loaded field should show its success checkmark"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingHostname.querySelector(".input-success")),
+    "A custom-invalid loaded field should not show a success checkmark"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingHostname.querySelector(".input-warning")),
+    "A custom-invalid loaded field should not show an error before interaction"
+  );
+  Assert.equal(
+    incomingHostname.querySelector("input").getAttribute("aria-invalid"),
+    "false",
+    "A custom-invalid loaded field should not expose an error before interaction"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingUsername.querySelector(".input-warning")),
+    "An empty loaded field should not show an error before interaction"
+  );
+  Assert.equal(
+    incomingUsername.querySelector("input").getAttribute("aria-invalid"),
+    "false",
+    "An empty loaded field should not expose an error before interaction"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingPort.querySelector(".input-warning")),
+    "An out-of-range loaded field should not show an error before interaction"
+  );
+  Assert.equal(
+    incomingPort.querySelector("input").getAttribute("aria-invalid"),
+    "false",
+    "An out-of-range loaded field should not expose an error before interaction"
+  );
+
+  const configUpdatedEventPromise = BrowserTestUtils.waitForEvent(
+    subview,
+    "config-updated"
+  );
+  incomingHostname.dispatchEvent(
+    new browser.contentWindow.Event("input", { bubbles: true })
+  );
+  const { detail } = await configUpdatedEventPromise;
+
+  Assert.ok(
+    !detail.completed,
+    "A touched invalid field should mark the form incomplete"
+  );
+  Assert.ok(
+    BrowserTestUtils.isVisible(
+      incomingHostname.querySelector(".input-warning")
+    ),
+    "A touched invalid field should show an error"
+  );
+  Assert.equal(
+    incomingHostname.querySelector("input").getAttribute("aria-invalid"),
+    "true",
+    "A touched invalid field should expose its error"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingUsername.querySelector(".input-warning")),
+    "Untouched invalid fields should stay neutral when another field is touched"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(incomingPort.querySelector(".input-warning")),
+    "Untouched invalid native fields should stay neutral when another field is touched"
+  );
+
+  subview.resetState();
+});
+
 add_task(function test_setStateClearsTitleForUnknownIncomingType() {
   const state = new AccountConfig();
   state.incoming.type = "exchange";

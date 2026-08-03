@@ -4,9 +4,7 @@
 
 use std::ops::Deref;
 
-use base64::prelude::*;
-
-use moz_http::{Client, Response};
+use moz_http::{AuthIdentity, AuthType};
 use nserror::nsresult;
 use nsstring::{nsCString, nsString};
 use xpcom::{
@@ -18,16 +16,19 @@ use xpcom::{
 };
 
 use crate::{
-    authentication::{ntlm, oauth_listener::OAuthListener},
-    error::ProtocolError,
-    operation_sender::send_request::{OperationRequest, send_request},
+    authentication::oauth_listener::OAuthListener, error::ProtocolError,
+    operation_sender::pref_based_server::PrefBasedServer,
 };
+
+/// The name of the server property in which the authentication realm is stored.
+pub(crate) const REALM_SERVER_PROPERTY_NAME: &str = "realm";
 
 /// The credentials to use when authenticating against a server.
 #[derive(Clone)]
 pub enum Credentials {
-    /// The username and password to use for Basic authentication.
+    /// The realm, username and password to use for Basic authentication.
     Basic {
+        realm: String,
         username: String,
         password: String,
     },
@@ -38,83 +39,63 @@ pub enum Credentials {
         oauth_module: RefPtr<msgIOAuth2Module>,
     },
 
-    // The username and password to use for NTLM authentication.
+    // The domain, username and password to use for NTLM authentication.
     Ntlm {
+        domain: String,
         username: String,
         password: String,
     },
 }
 
-impl Credentials {
-    /// Validates the current set of credentials against the current request.
-    ///
-    /// This involves performing the request again with the current credentials.
-    /// This method is expected to be used after asking the user for new
-    /// credentials (if relevant).
-    ///
-    /// If authentication succeeded, the success response is returned, otherwise
-    /// [`ProtocolError::Authentication`] is used to indicate an authentication
-    /// failure. In this context, an authentication failure is any response with
-    /// a 401 status code.
-    pub(crate) async fn validate<'or>(
-        &self,
-        op_request: &OperationRequest<'or>,
-    ) -> Result<Response, ProtocolError> {
-        let resp = match &self {
-            // Validation for Basic authentication and OAuth2 is done by
-            // performing the request again with the `Authorization` set to the
-            // return value of `to_auth_header_value`, and checking that it does
-            // not result in a 401 Unauthorized response.
-            Credentials::Basic { .. } | Credentials::OAuth2 { .. } => {
-                // Get the value for the `Authorization` header.
-                let auth_hdr_value = match self.to_auth_header_value().await {
-                    Ok(value) => value,
-
-                    // When using OAuth2, `to_auth_header_value()` returns
-                    // `ProtocolError::Authentication` if it failed to get an
-                    // authentication token after running its auth flow, and we
-                    // propagate it here.
-                    Err(err) => return Err(err),
-                };
-
-                // We're in the case where we know we should include an
-                // `Authorization` header, so we should fail if we don't have
-                // one.
-                let auth_hdr_value = auth_hdr_value.ok_or(nserror::NS_ERROR_INVALID_ARG)?;
-
-                let resp = send_request(&Client::new(), op_request, Some(auth_hdr_value)).await?;
-
-                if resp.status()?.0 == 401 {
-                    return Err(ProtocolError::Authentication);
-                }
-
-                resp
-            }
-
-            // Validation for NTLM is is done by performing the full NTLM
-            // authentication flow and checking if we managed to get a 200
-            // response at the end of it.
-            Credentials::Ntlm { username, password } => {
-                ntlm::authenticate(username, password, op_request).await?
-            }
-        };
-
-        Ok(resp)
+impl<'ai> From<&'ai Credentials> for Option<AuthIdentity<'ai>> {
+    fn from(value: &'ai Credentials) -> Self {
+        match value {
+            Credentials::Basic {
+                realm,
+                username,
+                password,
+            } => Some(AuthIdentity {
+                auth_type: AuthType::Basic,
+                username,
+                password,
+                // `realm` might be an empty string (which currently doesn't
+                // matter since `moz_http` turns `None`s into empty strings
+                // anyway). Converting from an empty string to an option earlier
+                // on wouldn't buy us much and adds more complexity and
+                // confusion in other areas of the code.
+                realm: Some(realm),
+                path: None,
+                domain: None,
+            }),
+            Credentials::Ntlm {
+                domain,
+                username,
+                password,
+            } => Some(AuthIdentity {
+                auth_type: AuthType::Ntlm,
+                username,
+                password,
+                // `domain` might be an empty string (which currently doesn't
+                // matter since `moz_http` turns `None`s into empty strings
+                // anyway).
+                domain: Some(domain),
+                // NTLM doesn't seem to ever use realms.
+                realm: None,
+                path: None,
+            }),
+            // Unlike Basic and NTLM, OAuth2 isn't a "real" HTTP
+            // authentication scheme. In this case, we fall back to generating
+            // the `Authorization` header outside of Necko.
+            Credentials::OAuth2 { .. } => None,
+        }
     }
+}
 
+impl Credentials {
     /// Formats credentials to be used as the value of an HTTP Authorization
     /// header.
     pub async fn to_auth_header_value(&self) -> Result<Option<String>, ProtocolError> {
         match &self {
-            Self::Basic {
-                username, password, ..
-            } => {
-                // Format credentials per the "Basic" authentication scheme. See
-                // https://datatracker.ietf.org/doc/html/rfc7617 for details.
-                let auth_string = BASE64_STANDARD.encode(format!("{username}:{password}"));
-
-                Ok(Some(format!("Basic {auth_string}")))
-            }
             Self::OAuth2 { oauth_module, .. } => {
                 // Retrieve a bearer token from the OAuth2 module.
                 let listener = OAuthListener::new();
@@ -125,17 +106,17 @@ impl Credentials {
                     // The OAuth2 module will return `NS_ERROR_ABORT` if it's
                     // failed to get credentials even after prompting the user
                     // again, which qualifies as an authentication error.
-                    Err(nserror::NS_ERROR_ABORT) => return Err(ProtocolError::Authentication),
+                    Err(nserror::NS_ERROR_ABORT) => {
+                        return Err(ProtocolError::Authentication(None));
+                    }
 
                     Err(err) => return Err(err.into()),
                 };
 
                 Ok(Some(format!("Bearer {bearer_token}")))
             }
-            Self::Ntlm { .. } => {
-                // The flow for NTLM authentication differs from other methods,
-                // in such a way that we don't include an `Authorization` header
-                // in EWS requests.
+            Self::Basic { .. } | Self::Ntlm { .. } => {
+                // We defer Basic and NTLM authentication to Necko.
                 Ok(None)
             }
         }
@@ -147,10 +128,11 @@ pub trait AuthenticationProvider {
     /// Indicates the authentication method to use.
     fn auth_method(&self) -> Result<nsMsgAuthMethodValue, nsresult>;
 
-    /// Retrieves the username to use if using Basic auth.
+    /// Retrieves the username to authenticate with.
     fn username(&self) -> Result<nsCString, nsresult>;
 
-    /// Retrieves the password to use if using Basic auth.
+    /// Retrieves the password to authenticate with. May be empty, e.g. if using
+    /// OAuth2.
     fn password(&self) -> Result<nsString, nsresult>;
 
     /// Retrieves the hostname for the provider.
@@ -158,6 +140,10 @@ pub trait AuthenticationProvider {
 
     /// Retrieves the server's type string.
     fn server_type(&self) -> Result<nsCString, nsresult>;
+
+    /// Retrieves the realm to authenticate against. May be empty, e.g. if using
+    /// OAuth2 or NTLM, or if no realm is currently known for this server.
+    fn realm(&self) -> Result<nsCString, nsresult>;
 
     /// Creates and initializes an OAuth2 module.
     ///
@@ -171,6 +157,7 @@ pub trait AuthenticationProvider {
     fn get_credentials(&self) -> Result<Credentials, nsresult> {
         match self.auth_method()? {
             nsMsgAuthMethod::passwordCleartext => Ok(Credentials::Basic {
+                realm: self.realm()?.to_string(),
                 username: self.username()?.to_string(),
                 password: self.password()?.to_string(),
             }),
@@ -207,10 +194,23 @@ pub trait AuthenticationProvider {
                     }
                 }
             }
-            nsMsgAuthMethod::NTLM => Ok(Credentials::Ntlm {
-                username: self.username()?.to_string(),
-                password: self.password()?.to_string(),
-            }),
+            nsMsgAuthMethod::NTLM => {
+                let username = self.username()?.to_string();
+
+                // NTLM usernames might come in the form `domain\username`. Note
+                // that they might also come in the form `username@domain`, but
+                // this is done in order to work around the 15-character limit
+                // for domain length and such usernames should be sent to the
+                // server as is.
+                let (domain, username) =
+                    username.split_once('\\').unwrap_or(("", username.as_str()));
+
+                Ok(Credentials::Ntlm {
+                    domain: domain.to_string(),
+                    username: username.to_string(),
+                    password: self.password()?.to_string(),
+                })
+            }
             _ => {
                 log::error!("the preferred auth method is not supported");
                 Err(nserror::NS_ERROR_FAILURE)
@@ -256,6 +256,11 @@ impl AuthenticationProvider for nsIMsgIncomingServer {
         let mut hostname = nsCString::from("");
         unsafe { self.GetHostname(&raw mut *hostname) }.to_result()?;
         Ok(hostname)
+    }
+
+    fn realm(&self) -> Result<nsCString, nsresult> {
+        let realm = self.get_string_property(REALM_SERVER_PROPERTY_NAME)?;
+        Ok(nsCString::from(realm))
     }
 
     fn oauth2_module(
@@ -319,6 +324,11 @@ impl AuthenticationProvider for nsIMsgOutgoingServer {
         let mut hostname = nsCString::from("");
         unsafe { uri.GetHost(&raw mut *hostname) }.to_result()?;
         Ok(hostname)
+    }
+
+    fn realm(&self) -> Result<nsCString, nsresult> {
+        let realm = self.get_string_property(REALM_SERVER_PROPERTY_NAME)?;
+        Ok(nsCString::from(realm))
     }
 
     fn oauth2_module(

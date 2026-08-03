@@ -161,6 +161,28 @@ add_task(function test_setErrorState() {
   );
 });
 
+add_task(function test_setErrorStateCanHideError() {
+  customElement.setErrorState("error", { showError: false });
+
+  Assert.equal(
+    input.ariaInvalid,
+    "false",
+    "The input should not expose a hidden error as aria-invalid"
+  );
+  Assert.ok(!input.validity.valid, "The input should still be invalid");
+  Assert.deepEqual(
+    input.ariaDescribedByElements,
+    [],
+    "The hidden error should not describe the input"
+  );
+  Assert.ok(
+    !customElement.querySelector(`#${input.id}ErrorMessage`).role,
+    "The hidden error message should not have role attribute"
+  );
+
+  customElement.setErrorState("");
+});
+
 add_task(function test_helpText() {
   const helpTextInput =
     browser.contentDocument.createElement("account-hub-input");
@@ -253,4 +275,45 @@ add_task(function test_helpTextEmpty() {
   );
 
   helpTextInput.remove();
+});
+
+add_task(function test_setHelpTextClass() {
+  const helpText = customElement.querySelector(
+    ".account-hub-form-small-comment"
+  );
+
+  customElement.setAttribute("help-text-class", "config-change-comment");
+  customElement.setHelpText("account-hub-manual-config-value-changed", {
+    oldValue: "old.example.com",
+    newValue: "new.example.com",
+  });
+
+  Assert.ok(
+    BrowserTestUtils.isVisible(helpText),
+    "Help text should be visible"
+  );
+  Assert.ok(
+    helpText.classList.contains("config-change-comment"),
+    "Should apply the configured help text class"
+  );
+  Assert.deepEqual(
+    document.l10n.getAttributes(helpText),
+    {
+      id: "account-hub-manual-config-value-changed",
+      args: {
+        oldValue: "old.example.com",
+        newValue: "new.example.com",
+      },
+    },
+    "Should apply the help text l10n ID and args"
+  );
+
+  customElement.clearHelpText();
+  customElement.removeAttribute("help-text-class");
+
+  Assert.ok(BrowserTestUtils.isHidden(helpText), "Help text should be hidden");
+  Assert.ok(
+    !helpText.classList.contains("config-change-comment"),
+    "Should clear the configured help text class"
+  );
 });
