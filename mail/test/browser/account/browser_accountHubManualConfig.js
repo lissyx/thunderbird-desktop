@@ -21,7 +21,7 @@ const PREF_VALUE = Services.prefs.getCharPref(PREF_NAME);
 const GSSAPI_TEST_EMAIL = "badtest@example.localhost";
 const EXCHANGE_TEST_EMAIL = "testExchange@exchange.test";
 const EXCHANGE_TEST_PASSWORD = "hunter2";
-const EXCHANGE_TEST_URL = "http://exchange.test/EWS/Exchange.asmx"; // eslint-disable-line @microsoft/sdl/no-insecure-url
+const EXCHANGE_TEST_URL = "http://exchange.test/EWS/Exchange.asmx"; // eslint-disable-line sdl/no-insecure-url
 
 let gssapiSandbox;
 let gssapiDialog;
@@ -1243,6 +1243,31 @@ add_task(async function test_direct_to_manual_config_pref_enabled() {
     "The direct manual config flow should default to IMAP"
   );
 
+  await subtest_select_protocol_and_continue(dialog, "imap");
+
+  const manualConfigTemplate = dialog.querySelector(
+    "#emailManualConfigSubview"
+  );
+  await BrowserTestUtils.waitForAttributeRemoval(
+    "hidden",
+    manualConfigTemplate
+  );
+  Assert.equal(
+    manualConfigTemplate.captureState().incoming.type,
+    "imap",
+    "The manual config form should use the selected IMAP protocol"
+  );
+  subtest_assert_manual_config_hostnames_empty(manualConfigTemplate, "IMAP");
+
+  EventUtils.synthesizeMouseAtCenter(
+    dialog.querySelector("#emailFooter #back"),
+    {}
+  );
+  await BrowserTestUtils.waitForAttributeRemoval(
+    "hidden",
+    protocolSelectTemplate
+  );
+
   await subtest_select_protocol_and_continue(dialog, "microsoft");
 
   const exchangeSettingsSubview = dialog.querySelector(
@@ -1281,9 +1306,6 @@ add_task(async function test_direct_to_manual_config_pref_enabled() {
 
   await subtest_select_protocol_and_continue(dialog, "pop3");
 
-  const manualConfigTemplate = dialog.querySelector(
-    "#emailManualConfigSubview"
-  );
   await BrowserTestUtils.waitForAttributeRemoval(
     "hidden",
     manualConfigTemplate
@@ -1297,6 +1319,7 @@ add_task(async function test_direct_to_manual_config_pref_enabled() {
     "pop3",
     "The manual config form should use the selected POP3 protocol"
   );
+  subtest_assert_manual_config_hostnames_empty(manualConfigTemplate, "POP3");
 
   await subtest_close_account_hub_dialog(dialog, manualConfigTemplate);
   await cleanupManualConfigPref();
@@ -1664,9 +1687,23 @@ add_task(
       const authenticationSelect = exchangeTypeSubview.querySelector(
         "#exchangeTypeAuthentication"
       );
-      authenticationSelect.value = String(Ci.nsMsgAuthMethod.passwordCleartext);
+      authenticationSelect.value = String(Ci.nsMsgAuthMethod.OAuth2);
       authenticationSelect.select.dispatchEvent(
         new Event("change", { bubbles: true })
+      );
+
+      const defaultOauthInput = exchangeTypeSubview.querySelector(
+        "#exchangeTypeDefaultOauth"
+      );
+      Assert.ok(
+        defaultOauthInput.checked,
+        "Should currently be using default OAuth config"
+      );
+
+      EventUtils.synthesizeMouseAtCenter(defaultOauthInput, {});
+      await BrowserTestUtils.waitForAttributeRemoval(
+        "hidden",
+        exchangeTypeSubview.querySelector("#exchangeTypeOauthCustom")
       );
 
       const oldTab = tabmail.selectedTab;
@@ -1702,13 +1739,25 @@ add_task(
       );
       Assert.equal(
         incoming.authMethod,
-        Ci.nsMsgAuthMethod.passwordCleartext,
+        Ci.nsMsgAuthMethod.OAuth2,
         "Should save the selected Exchange authentication method"
       );
       Assert.equal(
         incoming.getStringValue("ews_url"),
         "https://outlook.office365.com/EWS/Exchange.asmx",
         "Should save the Exchange URL"
+      );
+      Assert.ok(
+        !incoming.exchangeOverrideOAuthDetails,
+        "Should not have any OAuth configuration overrides"
+      );
+      Assert.ok(
+        !incoming.exchangeApplicationId,
+        "Should not have an application ID for OAuth set"
+      );
+      Assert.ok(
+        !incoming.exchangeTenantId,
+        "Should not have a tenant ID for OAuth set"
       );
     } finally {
       if (accountTab && tabmail.tabInfo.includes(accountTab)) {
@@ -1883,5 +1932,21 @@ function subtest_assert_protocol_select_chrome(dialog, protocolSelectTemplate) {
   Assert.ok(
     BrowserTestUtils.isVisible(notification),
     "The protocol select screen should show the notification bar"
+  );
+}
+
+function subtest_assert_manual_config_hostnames_empty(
+  manualConfigTemplate,
+  protocol
+) {
+  Assert.equal(
+    manualConfigTemplate.querySelector("#manualIncomingHostname").value,
+    "",
+    `${protocol} manual config should not populate the incoming hostname`
+  );
+  Assert.equal(
+    manualConfigTemplate.querySelector("#manualOutgoingHostname").value,
+    "",
+    `${protocol} manual config should not populate the outgoing hostname`
   );
 }

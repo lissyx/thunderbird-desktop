@@ -690,6 +690,8 @@ NS_IMETHODIMP ExchangeIncomingServer::GetProtocolClient(
   // one we have.
   if (!mClient) {
     nsresult rv = NS_OK;
+    // Don't save this client as mClient until it is ready to use.
+    nsCOMPtr<IExchangeClient> tempClient;
 
     if (StaticPrefs::mail_graph_enabled()) {
       nsAutoCString type;
@@ -700,10 +702,11 @@ NS_IMETHODIMP ExchangeIncomingServer::GetProtocolClient(
       contractId.Append(type);
       contractId.Append("-client;1");
 
-      mClient = do_CreateInstance(contractId.Data(), &rv);
+      tempClient = do_CreateInstance(contractId.Data(), &rv);
       NS_ENSURE_SUCCESS(rv, rv);
     } else {
-      mClient = do_CreateInstance("@mozilla.org/messenger/ews-client;1", &rv);
+      tempClient =
+          do_CreateInstance("@mozilla.org/messenger/ews-client;1", &rv);
       NS_ENSURE_SUCCESS(rv, rv);
     }
 
@@ -716,8 +719,10 @@ NS_IMETHODIMP ExchangeIncomingServer::GetProtocolClient(
     NS_ENSURE_SUCCESS(rv, rv);
 
     // Set up the client object with access details.
-    rv = mClient->Initialize(endpoint, this);
+    rv = tempClient->Initialize(endpoint, this);
     NS_ENSURE_SUCCESS(rv, rv);
+
+    mClient = tempClient;
   }
 
   NS_IF_ADDREF(*ewsClient = mClient);
@@ -947,30 +952,23 @@ nsresult SetOAuthProperty(ExchangeIncomingServer* server,
 
 }  // namespace
 
-NS_IMETHODIMP ExchangeIncomingServer::GetExchangeOverrideOAuthDetails(
-    bool* value) {
-  NS_ENSURE_ARG(value);
-
-  RefPtr<ExchangeOAuth2CustomDetails> details;
-  nsresult rv = GetDetailsForHostname(this, getter_AddRefs(details));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  *value = details->GetConfiguredUseCustomDetails();
-
-  return NS_OK;
-}
-
-NS_IMETHODIMP ExchangeIncomingServer::SetExchangeOverrideOAuthDetails(
-    bool value) {
-  RefPtr<ExchangeOAuth2CustomDetails> details;
-  nsresult rv = GetDetailsForHostname(this, getter_AddRefs(details));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = details->SetConfiguredUseCustomDetails(value);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  return NS_OK;
-}
+#define DEFINE_OAUTH_BOOL_ACCESSORS(PropertyName, OAuthValueName)        \
+  NS_IMETHODIMP ExchangeIncomingServer::Get##PropertyName(bool* value) { \
+    NS_ENSURE_ARG(value);                                                \
+    RefPtr<ExchangeOAuth2CustomDetails> details;                         \
+    nsresult rv = GetDetailsForHostname(this, getter_AddRefs(details));  \
+    NS_ENSURE_SUCCESS(rv, rv);                                           \
+    *value = details->Get##OAuthValueName();                             \
+    return NS_OK;                                                        \
+  }                                                                      \
+  NS_IMETHODIMP ExchangeIncomingServer::Set##PropertyName(bool value) {  \
+    RefPtr<ExchangeOAuth2CustomDetails> details;                         \
+    nsresult rv = GetDetailsForHostname(this, getter_AddRefs(details));  \
+    NS_ENSURE_SUCCESS(rv, rv);                                           \
+    rv = details->Set##OAuthValueName(value);                            \
+    NS_ENSURE_SUCCESS(rv, rv);                                           \
+    return NS_OK;                                                        \
+  }
 
 #define DEFINE_OAUTH_PROPERTY_ACCESSORS(PropertyName, OAuthValueName)          \
   NS_IMETHODIMP ExchangeIncomingServer::Get##PropertyName(nsACString& value) { \
@@ -988,10 +986,16 @@ NS_IMETHODIMP ExchangeIncomingServer::SetExchangeOverrideOAuthDetails(
         });                                                                    \
   }
 
+DEFINE_OAUTH_BOOL_ACCESSORS(ExchangeOverrideOAuthDetails,
+                            ConfiguredUseCustomDetails);
 DEFINE_OAUTH_PROPERTY_ACCESSORS(ExchangeApplicationId, ConfiguredApplicationId);
 DEFINE_OAUTH_PROPERTY_ACCESSORS(ExchangeTenantId, ConfiguredTenant);
 DEFINE_OAUTH_PROPERTY_ACCESSORS(ExchangeRedirectUri, ConfiguredRedirectUri);
 DEFINE_OAUTH_PROPERTY_ACCESSORS(ExchangeEndpointHost, ConfiguredEndpointHost);
 DEFINE_OAUTH_PROPERTY_ACCESSORS(ExchangeOAuthScopes, ConfiguredOAuthScopes);
+DEFINE_OAUTH_BOOL_ACCESSORS(ExchangeUsePKCE, ConfiguredUsePKCE);
+DEFINE_OAUTH_BOOL_ACCESSORS(ExchangeUseExternalBrowser,
+                            ConfiguredUseExternalBrowser);
 
 #undef DEFINE_OAUTH_PROPERTY_ACCESSORS
+#undef DEFINE_OAUTH_BOOL_ACCESSORS

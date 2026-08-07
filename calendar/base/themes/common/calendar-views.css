@@ -223,6 +223,7 @@
 }
 
 .event-name-label {
+  pointer-events: none;
   white-space: nowrap;
 }
 
@@ -443,6 +444,10 @@ calendar-event-column .multiday-events-list {
 .multiday-hour-box-container {
   display: flex;
   flex-direction: column;
+}
+
+.multiday-hour-row {
+  display: contents;
 }
 
 .multiday-grid-rotated .multiday-hour-box-container {

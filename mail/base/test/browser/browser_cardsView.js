@@ -8,14 +8,26 @@ const { MessageGenerator } = ChromeUtils.importESModule(
 const { click_through_appmenu } = ChromeUtils.importESModule(
   "resource://testing-common/mail/WindowHelpers.sys.mjs"
 );
-const { ensure_cards_view } = ChromeUtils.importESModule(
-  "resource://testing-common/MailViewHelpers.sys.mjs"
-);
+const { ensure_cards_view, prepare_thread_row_descendant_click } =
+  ChromeUtils.importESModule(
+    "resource://testing-common/MailViewHelpers.sys.mjs"
+  );
 
 const tabmail = document.getElementById("tabmail");
 const about3Pane = tabmail.currentAbout3Pane;
 const { threadPane, threadTree } = about3Pane;
-let rootFolder, testFolder, testMessages, displayContext, displayButton;
+let rootFolder,
+  testFolder,
+  emptyFolder,
+  testMessages,
+  displayContext,
+  displayButton;
+
+async function clickThreadRow(row, event = {}) {
+  await prepare_thread_row_descendant_click(row, AccessibilityUtils);
+  EventUtils.synthesizeMouseAtCenter(row, event, about3Pane);
+  AccessibilityUtils.resetEnv();
+}
 
 add_setup(async function () {
   const account = MailServices.accounts.createLocalMailAccount();
@@ -25,6 +37,9 @@ add_setup(async function () {
   );
   testFolder = rootFolder
     .createLocalSubfolder("cardsView")
+    .QueryInterface(Ci.nsIMsgLocalMailFolder);
+  emptyFolder = rootFolder
+    .createLocalSubfolder("emptyFolder")
     .QueryInterface(Ci.nsIMsgLocalMailFolder);
 
   const generator = new MessageGenerator();
@@ -164,6 +179,11 @@ add_task(async function testSwitchToCardsView() {
     "row",
     "The message row should remain as Row Item"
   );
+  Assert.equal(
+    threadTree.getRowAtIndex(0).querySelector("td").getAttribute("role"),
+    "gridcell",
+    "The message card should be presented as Grid Cell"
+  );
 
   const tableRow = threadTree.getRowAtIndex(1);
   const tableData = tableRow.querySelector(".card-container");
@@ -208,17 +228,34 @@ add_task(async function testSwitchToCardsView() {
 });
 
 add_task(async function testTagsInVerticalView() {
+  await ensure_cards_view(document);
+  about3Pane.folderTree.focus();
+
+  const getCardTags = row => row.querySelector("thread-card-tags");
+  const getTagIcon = tags => tags.shadowRoot.querySelector(".tag-icon");
+
   const row = threadTree.getRowAtIndex(1);
+  Assert.ok(
+    getCardTags(row),
+    "the selected row should contain thread-card-tags"
+  );
+
   EventUtils.synthesizeMouseAtCenter(row, {}, about3Pane);
   Assert.ok(row.classList.contains("selected"), "the row should be selected");
 
-  const tag = row.querySelector(".tag-icon");
-  Assert.ok(BrowserTestUtils.isHidden(tag), "tag icon should be hidden");
+  const tags = getCardTags(row);
+  const tagIcon = getTagIcon(tags);
+  Assert.ok(BrowserTestUtils.isHidden(tagIcon), "tag icon should be hidden");
 
-  // Set the important tag.
-  EventUtils.synthesizeKey("1", {});
-  Assert.ok(BrowserTestUtils.isVisible(tag), "tag icon should be visible");
-  Assert.deepEqual(tag.title, "Important", "The important tag should be set");
+  const importantTag = MailServices.tags.getTagForKey("$label1");
+
+  EventUtils.synthesizeKey("1", {}, about3Pane);
+  await TestUtils.waitForCondition(
+    () => BrowserTestUtils.isVisible(tagIcon),
+    "Waiting for the Important tag icon to become visible"
+  );
+  Assert.ok(BrowserTestUtils.isVisible(tagIcon), "tag icon should be visible");
+  Assert.equal(tags.title, importantTag, "the important tag should be set");
 
   const row2 = threadTree.getRowAtIndex(2);
   EventUtils.synthesizeMouseAtCenter(row2, {}, about3Pane);
@@ -227,15 +264,20 @@ add_task(async function testTagsInVerticalView() {
     "the third row should be selected"
   );
 
-  const tag2 = row2.querySelector(".tag-icon");
-  Assert.ok(BrowserTestUtils.isHidden(tag2), "tag icon should be hidden");
+  const tags2 = getCardTags(row2);
+  const tagIcon2 = getTagIcon(tags2);
+  Assert.ok(BrowserTestUtils.isHidden(tagIcon2), "tag icon should be hidden");
 
-  // Set the work tag.
-  EventUtils.synthesizeKey("2", {});
-  Assert.ok(BrowserTestUtils.isVisible(tag2), "tag icon should be visible");
-  Assert.deepEqual(tag2.title, "Work", "The work tag should be set");
+  const workTag = MailServices.tags.getTagForKey("$label2");
 
-  // Switch back to a table layout and horizontal view.
+  EventUtils.synthesizeKey("2", {}, about3Pane);
+  await TestUtils.waitForCondition(
+    () => BrowserTestUtils.isVisible(tagIcon2),
+    "Waiting for the Work tag icon to become visible"
+  );
+  Assert.ok(BrowserTestUtils.isVisible(tagIcon2), "tag icon should be visible");
+  Assert.equal(tags2.title, workTag, "the work tag should be set");
+
   const shownPromise = BrowserTestUtils.waitForEvent(
     displayContext,
     "popupshown"
@@ -259,6 +301,8 @@ add_task(async function testTagsInVerticalView() {
     threadTree,
     "thread-row"
   );
+
+  // Switch back to a table layout and horizontal view.
   displayContext.activateItem(
     displayContext.querySelector("#threadPaneTableView")
   );
@@ -274,7 +318,20 @@ add_task(async function testTagsInVerticalView() {
 
   await ensure_cards_view(document);
   about3Pane.folderTree.focus();
-}).skip(); // TODO: update the test for tags on Bug 1860900.
+
+  const rowAfterSwitch = threadTree.getRowAtIndex(1);
+  const row2AfterSwitch = threadTree.getRowAtIndex(2);
+  Assert.equal(
+    getCardTags(rowAfterSwitch).title,
+    importantTag,
+    "Important tag should still be shown after switching views"
+  );
+  Assert.equal(
+    getCardTags(row2AfterSwitch).title,
+    workTag,
+    "Work tag should still be shown after switching views"
+  );
+});
 
 /**
  * This test Checks that:
@@ -287,8 +344,8 @@ add_task(async function testMessageMenuButton() {
   const row2 = threadTree.getRowAtIndex(2);
   const menuContext = about3Pane.document.getElementById("mailContext");
   const menuButton = row1.querySelector(".tree-button-more");
-  EventUtils.synthesizeMouseAtCenter(row1, {}, about3Pane);
-  EventUtils.synthesizeMouseAtCenter(row2, { shiftKey: true }, about3Pane);
+  await clickThreadRow(row1);
+  await clickThreadRow(row2, { shiftKey: true });
   Assert.ok(row1.classList.contains("selected"), "Row 1 should be selected");
   Assert.ok(row2.classList.contains("selected"), "Row 2 should be selected");
   EventUtils.synthesizeMouseAtCenter(menuButton, {}, about3Pane);
@@ -308,4 +365,57 @@ add_task(async function testMessageMenuButton() {
   menuContext.hidePopup();
   await BrowserTestUtils.waitForPopupEvent(menuContext, "hidden");
   about3Pane.folderTree.focus();
+});
+
+add_task(async function test_status_indicator_fluent() {
+  await ensure_cards_view(document);
+  about3Pane.folderTree.focus();
+
+  let tableRow = threadTree.getRowAtIndex(1);
+  let readStatus = tableRow.querySelector(".read-status");
+
+  Assert.ok(
+    BrowserTestUtils.isVisible(readStatus),
+    "The status indicator should be visible"
+  );
+  Assert.equal(
+    document.l10n.getAttributes(readStatus).id,
+    "tree-list-view-row-new-status",
+    "A new message should have the correct fluent ID for the status indicator"
+  );
+
+  about3Pane.paneLayout.messagePaneVisible = true;
+  EventUtils.synthesizeMouseAtCenter(tableRow, {}, about3Pane);
+  await BrowserTestUtils.waitForEvent(window, "MsgLoaded");
+  await TestUtils.waitForCondition(
+    () => testMessages.at(1).isRead,
+    "waiting for message 0 to be marked as read"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(readStatus),
+    "The status indicator should be hidden after selecting the row"
+  );
+
+  about3Pane.displayFolder(emptyFolder.URI);
+  await TestUtils.waitForTick();
+
+  const allMessagesLoadedPromise = BrowserTestUtils.waitForEvent(
+    about3Pane,
+    "allMessagesLoaded"
+  );
+  about3Pane.displayFolder(testFolder.URI);
+  await allMessagesLoadedPromise;
+  await TestUtils.waitForTick();
+
+  tableRow = about3Pane.threadTree.getRowAtIndex(2);
+  readStatus = tableRow.querySelector(".read-status");
+  Assert.ok(
+    BrowserTestUtils.isVisible(readStatus),
+    "The status indicator should be visible"
+  );
+  Assert.equal(
+    document.l10n.getAttributes(readStatus).id,
+    "tree-list-view-row-not-read-status",
+    "An unread message should have the correct fluent ID for the status indicator"
+  );
 });

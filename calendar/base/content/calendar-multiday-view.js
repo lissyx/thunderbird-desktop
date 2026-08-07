@@ -83,7 +83,7 @@
     static get fragment() {
       const frag = document.importNode(
         MozXULElement.parseXULToFragment(`
-          <stack class="multiday-column-box-stack" flex="1">
+          <stack class="multiday-column-box-stack" flex="1" role="presentation">
             <html:div class="multiday-hour-box-container"></html:div>
             <html:ol class="multiday-events-list"></html:ol>
             <box class="timeIndicator" hidden="hidden"/>
@@ -117,22 +117,41 @@
      *
      * @type {calIDateTime}
      */
-    date;
+    #date;
+
+    /**
+     * The first visible working hour for the column. This is used as the
+     * keyboard entry point for the hour grid.
+     *
+     * @type {number}
+     */
+    #dayStartHour = 0;
 
     connectedCallback() {
       if (this.delayConnectedCallback() || this.hasChildNodes()) {
         return;
       }
       this.appendChild(this.constructor.fragment.cloneNode(true));
+      this.setAttribute("role", "grid");
       this.hourBoxContainer = this.querySelector(".multiday-hour-box-container");
       for (let hour = 0; hour < 24; hour++) {
+        const hourRow = document.createElement("div");
+        hourRow.classList.add("multiday-hour-row");
+        hourRow.setAttribute("role", "row");
         const hourBox = document.createElement("div");
         hourBox.classList.add("multiday-hour-box");
-        this.hourBoxContainer.appendChild(hourBox);
+        hourBox.setAttribute("role", "gridcell");
+        hourBox.setAttribute("aria-rowindex", hour + 1);
+        hourBox.setAttribute("aria-colindex", 1);
+        hourBox.tabIndex = -1;
+        hourRow.appendChild(hourBox);
+        this.hourBoxContainer.appendChild(hourRow);
         this.hourBoxes.push(hourBox);
       }
 
       this.eventsListElement = this.querySelector(".multiday-events-list");
+      this.eventsListElement.setAttribute("role", "listbox");
+      this.eventsListElement.setAttribute("aria-label", lazy.l10n.formatValueSync("events-only"));
 
       this.addEventListener("dblclick", event => {
         if (event.button != 0) {
@@ -256,6 +275,15 @@
       this.mFgboxes = null;
 
       this.initializeAttributeInheritance();
+    }
+
+    set date(val) {
+      this.#date = val;
+      this.updateHourBoxAccessibility();
+    }
+
+    get date() {
+      return this.#date;
     }
 
     /**
@@ -464,6 +492,7 @@
         // Create a new wrapper.
         const eventElement = document.createElement("li");
         eventElement.classList.add("multiday-event-listitem");
+        eventElement.setAttribute("role", "presentation");
         // Set up the event box.
         const eventBox = document.createXULElement("calendar-event-box");
         eventElement.appendChild(eventBox);
@@ -1370,11 +1399,45 @@
       if (dayStartHour < 0 || dayStartHour > dayEndHour || dayEndHour > 24) {
         throw Components.Exception("", Cr.NS_ERROR_INVALID_ARG);
       }
+      this.#dayStartHour = Math.min(dayStartHour, this.hourBoxes.length - 1);
       for (const [hour, hourBox] of this.hourBoxes.entries()) {
         hourBox.classList.toggle(
           "multiday-hour-box-off-time",
           hour < dayStartHour || hour >= dayEndHour
         );
+      }
+      this.updateHourBoxAccessibility();
+    }
+
+    /**
+     * Updates accessible names and the keyboard entry point for the background
+     * hour cells.
+     */
+    updateHourBoxAccessibility() {
+      if (!this.date || !this.hourBoxes.length) {
+        return;
+      }
+
+      const formatter = cal.dtz.formatter;
+      const dateLabel = lazy.l10n.formatValueSync("day-header", {
+        dayName: formatter.weekdayNames[this.date.weekday],
+        dayIndex: formatter.formatDateWithoutYear(this.date),
+      });
+      this.setAttribute("aria-label", dateLabel);
+
+      for (const [hour, hourBox] of this.hourBoxes.entries()) {
+        const dateTime = this.date.clone();
+        dateTime.isDate = false;
+        dateTime.hour = hour;
+        dateTime.minute = 0;
+        hourBox.setAttribute(
+          "aria-label",
+          lazy.l10n.formatValueSync("calendar-multiday-hour-slot", {
+            date: dateLabel,
+            time: formatter.formatTime(dateTime),
+          })
+        );
+        hourBox.tabIndex = hour == this.#dayStartHour ? 0 : -1;
       }
     }
 
@@ -1458,6 +1521,8 @@
 
       this.eventsListElement = document.createElement("ol");
       this.eventsListElement.classList.add("allday-events-list");
+      this.eventsListElement.setAttribute("role", "listbox");
+      this.eventsListElement.setAttribute("aria-label", lazy.l10n.formatValueSync("events-only"));
       this.appendChild(this.eventsListElement);
     }
 
@@ -1499,6 +1564,7 @@
       const itemBox = document.createXULElement("calendar-editable-item");
       const listItemWrapper = document.createElement("li");
       listItemWrapper.classList.add("allday-event-listitem");
+      listItemWrapper.setAttribute("role", "presentation");
       listItemWrapper.appendChild(itemBox);
       cal.data.binaryInsertNode(
         this.eventsListElement,
@@ -1567,6 +1633,7 @@
           // Insert an empty list item.
           const dropshadow = document.createElement("li");
           dropshadow.classList.add("dropshadow", "allday-event-listitem");
+          dropshadow.setAttribute("role", "presentation");
           this.eventsListElement.insertBefore(dropshadow, this.eventsListElement.firstElementChild);
         }
       } else if (existing) {
@@ -1793,6 +1860,7 @@
 
       this.style.pointerEvents = "auto";
       this.setAttribute("tooltip", "itemTooltip");
+      this.initializeItemAccessibility();
 
       this.addEventNameTextboxListener();
       this.initializeAttributeInheritance();

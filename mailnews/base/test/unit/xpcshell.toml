@@ -57,6 +57,8 @@ tags = ["compact"]
 
 ["test_copyToInvalidDB.js"]
 
+["test_createSubfolder.js"]
+
 ["test_detachToFile.js"]
 
 ["test_emptyTrash.js"]
@@ -183,3 +185,5 @@ tags = ["virtualfolders"]
 
 ["test_virtualFolders4.js"]
 tags = ["virtualfolders"]
+
+["test_notificationCountMultiAccount.js"]

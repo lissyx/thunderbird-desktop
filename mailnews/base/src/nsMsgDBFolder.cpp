@@ -55,6 +55,7 @@
 #include "nsIURIMutator.h"
 #include "nsIXULAppInfo.h"
 #include "mozilla/Components.h"
+#include "mozilla/dom/Promise.h"
 #include "mozilla/intl/Localization.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Preferences.h"
@@ -75,6 +76,7 @@
 #endif  // MOZ_PANORAMA
 
 using namespace mozilla;
+using mozilla::dom::Promise;
 
 #define oneHour 3600000000U
 
@@ -237,6 +239,7 @@ nsMsgDBFolder::nsMsgDBFolder(void)
       mNotifyCountChanges(true),
       mExpungedBytes(0),
       mInitializedFromCache(false),
+      mDiscoveredSubFolders(false),
       mSemaphoreHolder(nullptr),
       mNumPendingUnreadMessages(0),
       mNumPendingTotalMessages(0),
@@ -3212,6 +3215,7 @@ NS_IMETHODIMP nsMsgDBFolder::GetAbbreviatedName(nsAString& aAbbreviatedName) {
 
 NS_IMETHODIMP
 nsMsgDBFolder::GetChildNamed(const nsACString& aName, nsIMsgFolder** aChild) {
+  NS_ENSURE_STATE(!aName.IsEmpty());
   NS_ENSURE_ARG_POINTER(aChild);
   nsTArray<RefPtr<nsIMsgFolder>> dummy;
   GetSubFolders(dummy);  // initialize mSubFolders
@@ -3391,6 +3395,49 @@ NS_IMETHODIMP nsMsgDBFolder::RecursiveDelete(bool deleteStorage) {
 NS_IMETHODIMP nsMsgDBFolder::CreateSubfolder(const nsACString& folderName,
                                              nsIMsgWindow* msgWindow) {
   return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP nsMsgDBFolder::CreateSubfolderWithListener(const nsACString&,
+                                                         nsIUrlListener*) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP nsMsgDBFolder::CreateSubfolderAsync(
+    const nsACString& folderName, JSContext* cx,
+    mozilla::dom::Promise** aPromise) {
+  ErrorResult result;
+  RefPtr<Promise> promise =
+      Promise::Create(xpc::CurrentNativeGlobal(cx), result);
+
+  nsMainThreadPtrHandle<Promise> promiseHolder(
+      new nsMainThreadPtrHolder<Promise>("CreateSubfolderAsync promise",
+                                         promise));
+
+  RefPtr<UrlListener> listener = new UrlListener();
+  listener->mStopFn = [&, folderName = nsCString(folderName),
+                       promiseHolder = std::move(promiseHolder)](
+                          nsIURI* url, nsresult rv) -> nsresult {
+    if (NS_FAILED(rv)) {
+      promiseHolder.get()->MaybeReject(rv);
+      return NS_OK;
+    }
+    nsCOMPtr<nsIMsgFolder> newFolder;
+    rv = GetChildNamed(folderName, getter_AddRefs(newFolder));
+    if (NS_FAILED(rv)) {
+      promiseHolder.get()->MaybeReject(rv);
+      return NS_OK;
+    }
+    if (!newFolder) {
+      promiseHolder.get()->MaybeReject(NS_MSG_ERROR_FOLDER_MISSING);
+      return NS_OK;
+    }
+    promiseHolder.get()->MaybeResolve(newFolder);
+    return NS_OK;
+  };
+
+  CreateSubfolderWithListener(folderName, listener);
+  promise.forget(aPromise);
+  return NS_OK;
 }
 
 NS_IMETHODIMP nsMsgDBFolder::AddSubfolder(const nsACString& name,
@@ -4521,8 +4568,8 @@ nsMsgDBFolder::PerformActionsOnJunkMsgs(
 
   if (moveMessages) {
     CopyServiceListener* copyListener = new CopyServiceListener;
-    copyListener->mStopFn = [listener = nsCOMPtr<nsIUrlListener>(listener)](
-                                nsresult status) -> nsresult {
+    copyListener->mStopCopyFn =
+        [listener = nsCOMPtr(listener)](nsresult status) -> nsresult {
       if (listener) {
         listener->OnStopRunningUrl(nullptr, status);
       }
@@ -4916,6 +4963,40 @@ NS_IMETHODIMP nsMsgDBFolder::GetMessageHeader(nsMsgKey msgKey,
 NS_IMETHODIMP nsMsgDBFolder::GetDescendants(
     nsTArray<RefPtr<nsIMsgFolder>>& aDescendants) {
   aDescendants.Clear();
+
+  // `mSubFolders` only holds folders that have already been discovered into
+  // memory. At startup the subfolders of accounts other than the one shown in
+  // the folder pane have not been discovered yet, so callers that walk the
+  // descendants (for example the unread-count badge) would miss them. Ask the
+  // message store which children exist on disk and add any that are missing,
+  // so descendant enumeration is complete regardless of what has been loaded
+  // so far. The recursion below walks into each child, which discovers deeper
+  // levels in turn. Panorama keeps the hierarchy in its folder database rather
+  // than the store, so it does not need this.
+  if (!mDiscoveredSubFolders &&
+      !StaticPrefs::mail_panorama_enabled_AtStartup()) {
+    // Set the flag before discovering to guard against re-entrancy while the
+    // store adds the subfolders.
+    mDiscoveredSubFolders = true;
+    nsCOMPtr<nsIMsgPluggableStore> store;
+    if (NS_SUCCEEDED(GetMsgStore(getter_AddRefs(store))) && store) {
+      // Use DiscoverChildFolders (a read-only listing) rather than
+      // DiscoverSubFolders, which as a side effect creates a directory at the
+      // folder path when it does not exist yet and would corrupt folders whose
+      // store file has not been written.
+      nsTArray<nsCString> childNames;
+      if (NS_SUCCEEDED(store->DiscoverChildFolders(this, childNames))) {
+        for (const auto& childName : childNames) {
+          nsCOMPtr<nsIMsgFolder> child;
+          GetChildNamed(childName, getter_AddRefs(child));
+          if (!child) {
+            AddSubfolder(childName, getter_AddRefs(child));
+          }
+        }
+      }
+    }
+  }
+
   for (nsIMsgFolder* child : mSubFolders) {
     aDescendants.AppendElement(child);
     nsTArray<RefPtr<nsIMsgFolder>> grandchildren;
