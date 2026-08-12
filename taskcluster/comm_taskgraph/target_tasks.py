@@ -88,29 +88,11 @@ def target_tasks_tb_rust_vendor_check(full_task_graph, parameters, graph_config)
 
 @register_target_task("enterprise_thunderbird_tasks")
 def target_tasks_enterprise_thunderbird(full_task_graph, parameters, graph_config):
-    def filter(task):
-        if task.attributes.get("shippable", False):
-            return False
-
-        if task.kind not in ["build", "test"]:
-            return False
-
-        return True
-
-    return [l for l in target_tasks_enterprise_firefox(full_task_graph, parameters, graph_config) if filter(full_task_graph[l])]
+    return [l for l in target_tasks_enterprise_firefox(full_task_graph, parameters, graph_config)]
 
 
 @register_target_task("enterprise_thunderbird_with_tests_tasks")
 def target_tasks_enterprise_thunderbird_with_tests(
     full_task_graph, parameters, graph_config
 ):
-    def filter(task):
-        if task.attributes.get("shippable", False):
-            return False
-
-        if task.kind not in ["build", "test"]:
-            return False
-
-        return True
-
-    return [l for l in target_tasks_enterprise_firefox_with_tests(full_task_graph, parameters, graph_config) if filter(full_task_graph[l])]
+    return [l for l in target_tasks_enterprise_firefox_with_tests(full_task_graph, parameters, graph_config)]
