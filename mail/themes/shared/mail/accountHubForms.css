@@ -310,6 +310,16 @@ form {
   }
 }
 
+.form-field-with-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hub-space-small);
+
+  tb-banner a {
+    color: inherit;
+  }
+}
+
 div:has(legend) {
   display: flex;
 }
