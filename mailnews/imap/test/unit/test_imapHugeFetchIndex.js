@@ -4,7 +4,7 @@
 
 /*
  * Regression test for unsolicited FETCH responses with huge sequence
- * numbers, sent before authentication:
+ * numbers, sent with the response to CAPABILITY:
  *
  *   * 16777217 FETCH (UID 1 FLAGS ())<CR><LF>
  *   * 1073741823 FETCH (UID 1 FLAGS ())<CR><LF>
