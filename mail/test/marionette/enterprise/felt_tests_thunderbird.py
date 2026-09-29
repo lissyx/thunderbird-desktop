@@ -13,20 +13,6 @@ from felt_tests import FeltTests
 
 
 class FeltTestsThunderbird(FeltTests):
-    def open_tab_child(self, url):
-        with self._child_driver.using_context(self._child_driver.CONTEXT_CHROME):
-            self._child_driver.execute_script("""
-                const url = arguments[0];
-                const mainWin = Services.wm.getMostRecentWindow("mail:3pane");
-                const tabmail = mainWin.document.getElementById("tabmail");
-                const oldShouldSwitchTo = tabmail.tabModes["contentTab"].shouldSwitchTo;
-                tabmail.tabModes["contentTab"].shouldSwitchTo = () => {
-                    return -1;
-                };
-                tabmail.openTab("contentTab", { url });
-                tabmail.tabModes["contentTab"].shouldSwitchTo = oldShouldSwitchTo;
-            """, [ url ])
-
     def close_tab_child(self):
         with self._child_driver.using_context(self._child_driver.CONTEXT_CHROME):
             self._child_driver.execute_script("""
@@ -44,27 +30,12 @@ class FeltTestsThunderbird(FeltTests):
                 return [...mainWin.document.querySelectorAll("browser")].filter(b => b.docShell?.document?.location == url)[0];
             """, [ url ])
 
-    def get_current_tab(self):
-        with self._child_driver.using_context(self._child_driver.CONTEXT_CHROME):
-            return self._child_driver.execute_script("""
-                const mainWin = Services.wm.getMostRecentWindow("mail:3pane");
-                const tabmail = mainWin.document.getElementById("tabmail");
-                return tabmail._getTabContextForTabbyThing(null, true)[1].browser;
-            """)
-
     def get_current_uri(self):
         with self._child_driver.using_context(self._child_driver.CONTEXT_CHROME):
-            tab = self.get_current_tab()
+            tab = self.get_current_tab_child()
             return self._child_driver.execute_script("""
                 return arguments[0].docShell?.currentDocumentChannel?.originalURI?.spec;
             """, [tab])
-
-    def get_elem_child(self, selector):
-        with self._child_driver.using_context(self._child_driver.CONTEXT_CHROME):
-            tab = self.get_current_tab()
-            return self._child_driver.execute_script("""
-                return arguments[0].docShell.document.querySelector(arguments[1]);
-            """, [ tab, selector ])
 
 class FeltTestsThunderbirdUi(FeltTestsThunderbird):
     def get_elem_child(self, selector):
