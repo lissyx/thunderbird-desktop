@@ -132,6 +132,26 @@ release-promotion:
             target-tasks-method: ship_desktop
             version-bump: true
             partial-updates: true
+        promote_thunderbird_ent:
+            product: thunderbird-enterprise
+            rebuild-kinds:
+                - enterprise-repack
+                - enterprise-repack-mac-signing
+                - enterprise-repack-mac-notarization
+                - enterprise-repack-repackage
+                - repackage-deb
+                - repackage-msi
+                - repackage-msix
+                - repackage-signing-msi
+                - repackage-signing-msix
+                - repackage-shippable-l10n-msix
+            target-tasks-method: promote_firefox_enterprise_tasks
+        push_thunderbird_enterprise:
+            product: thunderbird-enterprise
+            target-tasks-method: push_firefox_enterprise_tasks
+        ship_thunderbird_enterprise:
+            product: thunderbird-enterprise
+            target-tasks-method: ship_firefox_enterprise_tasks
 
 # Mapping of project to list of branches that should be considered "release"
 # level. A value of `True` means all branches are considered release
