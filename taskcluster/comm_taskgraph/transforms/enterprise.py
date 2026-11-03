@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import json
+
 from taskgraph.transforms.base import TransformSequence
 
 from gecko_taskgraph.transforms.repackage_routes import transforms as repackage_routes_transforms
@@ -116,4 +118,64 @@ def add_tbrust_vendor(config, jobs):
                         maybe_add_dep(job, "linux64-node")
                         maybe_add_dep(job, "linux64-rust")
 
+        yield job
+
+
+def _override(dest, source):
+    for key, value in source.items():
+        if isinstance(value, dict) and isinstance(dest.get(key), dict):
+            _override(dest[key], value)
+        else:
+            dest[key] = value
+
+
+@transforms.add
+def override_with_task_defaults(config, jobs):
+    """Override the Firefox Enterprise reference tasks with the kind's
+    task-defaults. Unlike the task-defaults merge, lists are replaced rather
+    than appended to."""
+    overrides = config.config.get("task-defaults", {})
+    for job in jobs:
+        _override(job, overrides)
+        yield job
+
+
+def _raw_prefix(repository, revision):
+    raw_base = repository.replace("https://github.com/", "https://raw.githubusercontent.com/")
+    return f"{raw_base}/{revision}/"
+
+
+@transforms.add
+def use_comm_repository_in_release_definition(config, jobs):
+    """Point the release definition at the comm repository.
+
+    gecko_taskgraph.transforms.enterprise_release_definition takes the source,
+    the revision and the in-tree policies URLs from the gecko
+    head_repository/head_rev parameters, while Thunderbird's live in the comm
+    repository.
+    """
+    params = config.params
+    gecko_prefix = _raw_prefix(params["head_repository"], params["head_rev"])
+    comm_prefix = _raw_prefix(params["comm_head_repository"], params["comm_head_rev"])
+
+    def rebase(url):
+        if url.startswith(gecko_prefix):
+            return comm_prefix + url.removeprefix(gecko_prefix)
+        return url
+
+    for job in jobs:
+        env = job["worker"]["env"]
+        definition = json.loads(env["RELEASE_DEFINITION"]["task-reference"])
+        definition["source"] = params["comm_head_repository"]
+        definition["revision"] = params["comm_head_rev"]
+
+        policies = definition["policies"]
+        policies["policies_schema"] = rebase(policies["policies_schema"])
+        policies["ftl_files"] = {
+            locale: rebase(url) for locale, url in policies["ftl_files"].items()
+        }
+
+        env["RELEASE_DEFINITION"] = {
+            "task-reference": json.dumps(definition, separators=(",", ":"))
+        }
         yield job
