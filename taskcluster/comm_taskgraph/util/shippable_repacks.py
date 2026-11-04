@@ -76,8 +76,7 @@ def get_shippable_repacks_produced_index(parameters, graph_config):
 def _is_gated(parameters):
     return (
         "enterprise" in parameters["project"]
-        and parameters["level"] == "3"
-        and parameters["tasks_for"] == "github-push"
+        and parameters["tasks_for"] in ("github-push", "github-pull-request")
     )
 
 

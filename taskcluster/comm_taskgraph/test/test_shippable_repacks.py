@@ -112,9 +112,10 @@ class TestShouldScheduleShippableRepacks(unittest.TestCase):
         state_task.assert_not_called()
 
     def test_not_gated(self, find_task_id, state_task, client):
+        # WIP: level 1 pushes and pull requests are gated too.
         for overrides in (
-            {"level": "1"},
-            {"tasks_for": "github-pull-request"},
+            {"tasks_for": "cron"},
+            {"tasks_for": "action"},
             {"project": "comm-central"},
         ):
             self.assertTrue(
